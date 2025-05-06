@@ -1,4 +1,5 @@
 acpid
+alsa-utils
 amd-ucode
 ansible-core
 asusctl
@@ -52,6 +53,7 @@ qt6-wayland
 sddm
 slurp
 smartmontools
+spotify-player-full
 starship
 stow
 supergfxctl
