@@ -65,3 +65,5 @@ copy $DEV_ENV/env/.zshenv $HOME/.zshenv
 copy $DEV_ENV/env/.zshrc $HOME/.zshrc
 copy $DEV_ENV/env/.gitconfig $HOME/.gitconfig
 copy $DEV_ENV/env/.config/starship.toml $XDG_CONFIG_HOME
+
+hyprctl reload
