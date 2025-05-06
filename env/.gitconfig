@@ -1,0 +1,6 @@
+[user]
+    email = cjcounsell@gmail.com
+    name = Chase Counsell
+
+[includeIf "gitdir:~/work/"]
+    path = ~/.gitconfig-work

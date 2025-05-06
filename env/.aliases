@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+alias ani-cli="ani-cli --vlc"
+alias air="$HOME/go/bin/air"
+if command -v batcat >/dev/null 2>&1; then
+    alias bat="batcat"
+fi
+alias cat="bat"
+alias lg="lazygit"
+alias ls="eza --icons -l -T -L=1"
+alias lzd="lazydocker"
+alias sail='[ -f sail ] && sh sail || sh vendor/bin/sail'
+alias v="nvim"
+alias vz="NVIM_APPNAME=lazy nvim"
+alias vl="NVIM_APPNAME=lazyvim nvim"
