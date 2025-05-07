@@ -2,11 +2,11 @@ acpid
 alsa-utils
 amd-ucode
 ansible-core
+arc-gtk-theme
 asusctl
 base
 base-devel
 bat
-brave-bin
 brightnessctl
 btop
 btrfs-progs
@@ -49,7 +49,9 @@ pipewire-pulse
 polkit-kde-agent
 power-profiles-daemon
 qt5-wayland
+qt5ct
 qt6-wayland
+qt6ct
 sddm
 slurp
 smartmontools
@@ -65,9 +67,11 @@ ttf-jetbrains-mono-nerd
 ttf-nerd-fonts-symbols
 uwsm
 vim
+vivaldi
 vulkan-intel
 vulkan-radeon
 waybar
+wezterm-git
 wget
 wireless_tools
 wireplumber
@@ -75,6 +79,7 @@ wl-clipboard
 wlogout-git
 wofi
 wpa_supplicant
+xdg-desktop-portal-gtk
 xdg-desktop-portal-hyprland
 xdg-utils
 xf86-video-amdgpu
