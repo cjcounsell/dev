@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || exit 1
+
+if [[ -z "$DEV_ENV" ]]; then
+  echo "Error: DEV_ENV environment variable is required" >&2
+  exit 1
+fi
+
+export DEV_ENV
+
+grep_pattern=""
+dry_run=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry)
+      dry_run=1
+      ;;
+    *)
+      grep_pattern="$1"
+      ;;
+  esac
+  shift
+done
+
+log() {
+  if [[ $dry_run -eq 1 ]]; then
+    echo "[DRY_RUN]: $1"
+  else
+    echo "$1"
+  fi
+}
+
+log "RUN: env: $DEV_ENV -- grep: $grep_pattern"
+
+# Find executable files in runs directory
+runs_dir="$script_dir/runs"
+if [[ ! -d "$runs_dir" ]]; then
+  echo "Error: Directory $runs_dir not found" >&2
+  exit 1
+fi
+
+mapfile -t scripts < <(find "$runs_dir" -mindepth 1 -maxdepth 1 -type f -executable)
+
+for s in "${scripts[@]}"; do
+  if [[ -n "$grep_pattern" && "$(basename "$s")" != *"$grep_pattern"* ]]; then
+    log "grep \"$grep_pattern\" filtered out $s"
+    continue
+  fi
+
+  log "running script: $s"
+  if [[ $dry_run -eq 0 ]]; then
+    "$s" || echo "Error: Script $s failed" >&2
+  fi
+done
