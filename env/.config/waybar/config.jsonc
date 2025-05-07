@@ -12,10 +12,11 @@
     "backlight",
     "battery",
     "network",
-    "cpu",
-    "memory",
+    // "cpu",
+    // "memory",
     "tray",
-    "custom/lock"
+    "custom/lock",
+    "custom/power"
   ],
   "hyprland/workspaces": {
     "format": "{name}: {icon}",
@@ -83,5 +84,10 @@
     "tooltip": false,
     "on-click": "sh -c '(sleep 0.5s; hyprlock)' & disown",
     "format": ""
+  },
+  "custom/power": {
+    "tooltip": false,
+    "format": "",
+    "on-click": "wlogout"
   }
 }
