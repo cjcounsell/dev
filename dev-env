@@ -2,19 +2,21 @@
 
 dry_run="0"
 
-if [[ -z $XDG_CONFIG_HOME ]]; then
+# Check XDG_CONFIG_HOME
+if [[ -z "$XDG_CONFIG_HOME" ]]; then
   echo "XDG_CONFIG_HOME not defined"
   echo "Using ~/.config"
-  XDG_CONFIG_HOME=$HOME/.config
+  XDG_CONFIG_HOME="$HOME/.config"
 fi
 
-if [[ -z $DEV_ENV ]]; then
+# Check DEV_ENV
+if [[ -z "$DEV_ENV" ]]; then
   echo "DEV_ENV needs to be set"
   exit 1
 fi
 
 log() {
-  if [[ $dry_run == "1" ]]; then
+  if [[ "$dry_run" == "1" ]]; then
     echo "[DRY_RUN]: $1"
   else
     echo "$1"
@@ -24,46 +26,153 @@ log() {
 log "env: $DEV_ENV"
 
 update_files() {
-  log "Copying over files from: $1"
-  pushd $1 &>/dev/null
-  (
-    configs=$(find . -mindepth 1 -maxdepth 1 -type d)
-    for c in $configs; do
-      directory=${2%/}/${c#./}
-      log "    Removing: rm -rf $directory"
+  local src="$1" dest="$2"
+  [[ -d "$src" ]] || {
+    log "Source dir $src missing"
+    exit 1
+  }
+  [[ -w "$dest" ]] || {
+    log "No write permission for $dest"
+    exit 1
+  }
 
-      if [[ $dry_run == "0" ]]; then
-        rm -rf $directory
-      fi
+  log "Copying over files from: $src"
+  pushd "$src" >/dev/null || {
+    log "pushd failed"
+    exit 1
+  }
 
-      log "    Copying env: cp -r $c $2"
-      if [[ $dry_run == "0" ]]; then
-        cp -r ./$c $2
+  local configs
+  configs=$(find . -mindepth 1 -maxdepth 1 -type d)
+  for c in $configs; do
+    # Skip hypr folder
+    if [[ "${c#./}" == "hypr" ]]; then
+      continue
+    fi
+
+    local directory="${dest%/}/${c#./}"
+    log "    Removing: rm -rf \"$directory\""
+
+    if [[ "$dry_run" == "0" ]]; then
+      rm -rf "$directory" || {
+        log "Remove failed for $directory"
+        exit 1
+      }
+    fi
+
+    log "    Copying env: cp -r \"$c\" \"$dest\""
+    if [[ "$dry_run" == "0" ]]; then
+      cp -r "./$c" "$dest" || {
+        log "Copy failed for $c"
+        exit 1
+      }
+    fi
+  done
+
+  popd >/dev/null || {
+    log "popd failed"
+    exit 1
+  }
+}
+
+update_hypr() {
+  local src="$1" dest="$2"
+  [[ -d "$src" ]] || {
+    log "Source dir $src missing"
+    exit 1
+  }
+  [[ -w "$dest" ]] || {
+    log "No write permission for $dest"
+    exit 1
+  }
+
+  log "Updating hypr config from: $src to $dest"
+
+  # Remove files in dest that aren't in src, handling nested folders
+  if [[ "$dry_run" == "0" && -d "$dest" ]]; then
+    pushd "$dest" >/dev/null || {
+      log "pushd failed for $dest"
+      exit 1
+    }
+    # Find all files and directories in dest (including nested)
+    local dest_files
+    dest_files=$(find . -type f)
+    for df in $dest_files; do
+      local relative_path="${df#./}"
+      if [[ ! -e "$src/$relative_path" ]]; then
+        log "    Removing from dest: rm -f \"$dest/$relative_path\""
+        if [[ "$dry_run" == "0" ]]; then
+          rm -f "$dest/$relative_path" || {
+            log "Remove failed for $dest/$relative_path"
+            exit 1
+          }
+        fi
       fi
     done
+    # Clean up empty directories in dest
+    find . -type d -empty -delete 2>/dev/null
+    popd >/dev/null || {
+      log "popd failed"
+      exit 1
+    }
+  fi
 
-  )
-  popd &>/dev/null
+  # Copy all files from src to dest, preserving nested structure
+  log "    Copying hypr: cp -r \"$src/\"* \"$dest/\""
+  if [[ "$dry_run" == "0" ]]; then
+    cp -r "$src/"* "$dest/" || {
+      log "Copy failed for hypr"
+      exit 1
+    }
+  fi
 }
 
 copy() {
-  log "Removing: $2"
-  if [[ $dry_run == "0" ]]; then
-    rm $2
+  local src="$1" dest="$2"
+  [[ -f "$src" ]] || {
+    log "Source file $src missing"
+    exit 1
+  }
+  [[ -w "$(dirname "$dest")" ]] || {
+    log "No write permission for $(dirname "$dest")"
+    exit 1
+  }
+
+  if [[ -e "$dest" ]]; then
+    log "Removing: $dest"
+    if [[ "$dry_run" == "0" ]]; then
+      rm "$dest" || {
+        log "Remove failed for $dest"
+        exit 1
+      }
+    fi
   fi
-  log "Copying: $1 to $2"
-  if [[ $dry_run == "0" ]]; then
-    cp $1 $2
+
+  log "Copying: $src to $dest"
+  if [[ "$dry_run" == "0" ]]; then
+    cp "$src" "$dest" || {
+      log "Copy failed for $src"
+      exit 1
+    }
   fi
 }
 
-update_files $DEV_ENV/env/.config $XDG_CONFIG_HOME
-update_files $DEV_ENV/env/.local $HOME/.local
+# Execute updates
+update_files "$DEV_ENV/env/.config" "$XDG_CONFIG_HOME"
+update_files "$DEV_ENV/env/.local" "$HOME/.local"
+#
+copy "$DEV_ENV/env/.aliases" "$HOME/.aliases"
+copy "$DEV_ENV/env/.zshenv" "$HOME/.zshenv"
+copy "$DEV_ENV/env/.zshrc" "$HOME/.zshrc"
+copy "$DEV_ENV/env/.gitconfig" "$HOME/.gitconfig"
+copy "$DEV_ENV/env/.config/starship.toml" "$XDG_CONFIG_HOME/starship.toml"
 
-copy $DEV_ENV/env/.aliases $HOME/.aliases
-copy $DEV_ENV/env/.zshenv $HOME/.zshenv
-copy $DEV_ENV/env/.zshrc $HOME/.zshrc
-copy $DEV_ENV/env/.gitconfig $HOME/.gitconfig
-copy $DEV_ENV/env/.config/starship.toml $XDG_CONFIG_HOME
+update_hypr "$DEV_ENV/env/.config/hypr" "$XDG_CONFIG_HOME/hypr"
 
-hyprctl reload
+# Reload hyprctl if available
+if [[ "$dry_run" == "0" ]] && command -v hyprctl >/dev/null; then
+  hyprctl reload >/dev/null 2>&1 || {
+    log "hyprctl reload failed"
+    exit 1
+  }
+fi
