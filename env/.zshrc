@@ -1,33 +1,33 @@
-#/usr/bin/env zsh
+#!/usr/bin/env zsh
 
+# Initialize Oh My Zsh with plugins
 plugins=(git)
+[[ -f "$ZSH/oh-my-zsh.sh" ]] && source "$ZSH/oh-my-zsh.sh"
 
-[[ ! -f $ZSH/oh-my-zsh.sh ]] || source $ZSH/oh-my-zsh.sh
-[[ ! -f "$HOME/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh" ]] || source ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
-[[ ! -f "$HOME/.zshenv_work" ]] || source "$HOME/.zshenv_work"
-[[ ! -f "$HOME/.aliases_work" ]] || source "$HOME/.aliases_work"
-[[ ! -f "$HOME/.proxy" ]] || source "$HOME/.proxy"
-[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+# Source external configuration files if they exist
+local configs=(
+  "$HOME/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh"
+  "$HOME/.zshenv_work"
+  "$HOME/.aliases_work"
+  "$HOME/.proxy"
+  "$HOME/.aliases"
+)
+for config in "${configs[@]}"; do
+  [[ -f "$config" ]] && source "$config"
+done
 
-if command -v tmuxifier >/dev/null 2>&1; then
-    eval "$(tmuxifier init -)"
-fi
+# Load Bun completions
+[[ -s "$HOME/.bun/_bun" ]] && source "$HOME/.bun/_bun"
 
-if command -v starship >/dev/null 2>&1; then
-    eval "$(starship init zsh)"
-fi
+# Load NVM
+[[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh"
+[[ -s "$NVM_DIR/bash_completion" ]] && source "$NVM_DIR/bash_completion"
 
-if command -v zoxide >/dev/null 2>&1; then
-    eval "$(zoxide init --cmd cd zsh)"
-fi
+# Initialize tools if installed
+command -v tmuxifier >/dev/null 2>&1 && eval "$(tmuxifier init -)"
+command -v starship >/dev/null 2>&1 && eval "$(starship init zsh)"
+command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init --cmd cd zsh)"
 
-# bun completions
-[ -s "/home/zardios/.bun/_bun" ] && source "/home/zardios/.bun/_bun"
-
-[[ ! -f $HOME/.aliases ]] || source $HOME/.aliases
-
+# Key bindings
 bindkey '^ ' autosuggest-accept
-bindkey -s ^f "tmux-sessionizer\n"
-
+bindkey -s '^f' 'tmux-sessionizer\n'
