@@ -5,3 +5,6 @@ git submodule update
 pushd env/.config/nvim
 git checkout main
 popd
+pushd work
+git checkout main
+popd
