@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+if [[ -n "$WSL_DISTRO_NAME" ]] || grep -qi microsoft /proc/version; then
+    exit 0
+fi
+
 paru -S --noconfirm --needed ttf-font-awesome waybar ttf-jetbrains-mono-nerd ttf-nerd-fonts-symbols
 paru -S --noconfirm --needed hyprlock
 paru -S --noconfirm --needed hyprpaper hypridle
