@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+paru -S --needed --noconfirm openssh
+[[ -d "$HOME/personal/ansible" ]] && rm -rf "$HOME/personal/ansible"
+git clone https://github.com/cjcounsell/ansible "$HOME/personal/ansible"
+pushd "$HOME/personal/ansible"
+rm -rf "$HOME/.ssh" && cp -r .ssh ~
+ansible-vault decrypt "$HOME/.ssh/id_ed25519"
+eval $(ssh-agent -s)
+ssh-add $HOME/.ssh/id_ed25519

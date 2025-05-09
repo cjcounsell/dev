@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-sudo pacman -S --noconfirm zsh
+sudo pacman -S --noconfirm zsh starship
 hash -r
 chsh -s $(which zsh)
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+[[ -d "$HOME/.zsh/zsh-autosuggestions" ]] && rm -rf "$HOME/.zsh/zsh-autosuggestions"
 git clone https://github.com/zsh-users/zsh-autosuggestions ~/.zsh/zsh-autosuggestions
