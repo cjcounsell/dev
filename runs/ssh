@@ -8,3 +8,7 @@ rm -rf "$HOME/.ssh" && cp -r .ssh ~
 ansible-vault decrypt "$HOME/.ssh/id_ed25519"
 eval $(ssh-agent -s)
 ssh-add $HOME/.ssh/id_ed25519
+
+pushd $HOME/personal/dev
+git remote set-url origin git@github.com:cjcounsell/dev
+popd
