@@ -45,11 +45,6 @@ update_files() {
   local configs
   configs=$(find . -mindepth 1 -maxdepth 1 -type d)
   for c in $configs; do
-    # Skip hypr folder
-    if [[ "${c#./}" == "hypr" ]]; then
-      continue
-    fi
-
     local directory="${dest%/}/${c#./}"
     log "    Removing: rm -rf \"$directory\""
 
@@ -73,58 +68,6 @@ update_files() {
     log "popd failed"
     exit 1
   }
-}
-
-update_hypr() {
-  local src="$1" dest="$2"
-  [[ -d "$src" ]] || {
-    log "Source dir $src missing"
-    exit 1
-  }
-  [[ -w "$dest" ]] || {
-    log "No write permission for $dest"
-    exit 1
-  }
-
-  log "Updating hypr config from: $src to $dest"
-
-  # Remove files in dest that aren't in src, handling nested folders
-  if [[ "$dry_run" == "0" && -d "$dest" ]]; then
-    pushd "$dest" >/dev/null || {
-      log "pushd failed for $dest"
-      exit 1
-    }
-    # Find all files and directories in dest (including nested)
-    local dest_files
-    dest_files=$(find . -type f)
-    for df in $dest_files; do
-      local relative_path="${df#./}"
-      if [[ ! -e "$src/$relative_path" ]]; then
-        log "    Removing from dest: rm -f \"$dest/$relative_path\""
-        if [[ "$dry_run" == "0" ]]; then
-          rm -f "$dest/$relative_path" || {
-            log "Remove failed for $dest/$relative_path"
-            exit 1
-          }
-        fi
-      fi
-    done
-    # Clean up empty directories in dest
-    find . -type d -empty -delete 2>/dev/null
-    popd >/dev/null || {
-      log "popd failed"
-      exit 1
-    }
-  fi
-
-  # Copy all files from src to dest, preserving nested structure
-  log "    Copying hypr: cp -r \"$src/\"* \"$dest/\""
-  if [[ "$dry_run" == "0" ]]; then
-    cp -r "$src/"* "$dest/" || {
-      log "Copy failed for hypr"
-      exit 1
-    }
-  fi
 }
 
 copy() {
@@ -158,9 +101,15 @@ copy() {
 }
 
 # Execute updates
+
+# Disable hyprland auto reloading
+if [[ "$dry_run" == "0" ]] && command -v hyprctl >/dev/null; then
+  hyprctl keyword misc:disable_autoreload true
+fi
+
 update_files "$DEV_ENV/env/.config" "$XDG_CONFIG_HOME"
 update_files "$DEV_ENV/env/.local" "$HOME/.local"
-#
+
 copy "$DEV_ENV/env/.aliases" "$HOME/.aliases"
 copy "$DEV_ENV/env/.zprofile" "$HOME/.zprofile"
 copy "$DEV_ENV/env/.zshenv" "$HOME/.zshenv"
@@ -168,12 +117,11 @@ copy "$DEV_ENV/env/.zshrc" "$HOME/.zshrc"
 copy "$DEV_ENV/env/.gitconfig" "$HOME/.gitconfig"
 copy "$DEV_ENV/env/.config/starship.toml" "$XDG_CONFIG_HOME/starship.toml"
 
-update_hypr "$DEV_ENV/env/.config/hypr" "$XDG_CONFIG_HOME/hypr"
-
-# Reload hyprctl if available
+# Reload hyprland
 if [[ "$dry_run" == "0" ]] && command -v hyprctl >/dev/null; then
   hyprctl reload >/dev/null 2>&1 || {
     log "hyprctl reload failed"
     exit 1
   }
+  hyprctl keyword misc:disable_autoreload false
 fi
