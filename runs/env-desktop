@@ -8,6 +8,6 @@ paru -S --noconfirm --needed ttf-font-awesome waybar ttf-jetbrains-mono-nerd ttf
 paru -S --noconfirm --needed hyprlock
 paru -S --noconfirm --needed hyprpaper hypridle
 paru -S --noconfirm --needed wlogout-git
-paru -S --noconfirm --needed networkmanager catppuccin-cursors-mocha
-paru -S --noconfirm --needed zen-browser-bin
+paru -S --noconfirm --needed qt5ct qt5-wayland qt5-quickcontrols2 qt6ct qt6-wayland networkmanager catppuccin-cursors-mocha
+paru -S --noconfirm --needed zen-browser-bin thunar
 

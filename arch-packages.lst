@@ -52,6 +52,7 @@ pipewire-jack
 pipewire-pulse
 polkit-kde-agent
 power-profiles-daemon
+qt5-quickcontrols2
 qt5-wayland
 qt5ct
 qt6-wayland
@@ -64,6 +65,7 @@ starship
 stow
 supergfxctl
 switcheroo-control
+thunar
 tldr
 tmux
 ttf-font-awesome
