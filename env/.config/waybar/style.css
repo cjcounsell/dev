@@ -94,6 +94,7 @@
 #custom-music {
   color: @mauve;
   border-radius: 5px;
+  margin-right: 0.5rem;
 }
 
 #custom-lock {
