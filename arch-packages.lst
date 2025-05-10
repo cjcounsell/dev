@@ -3,6 +3,7 @@ alsa-utils
 amd-ucode
 ansible-core
 arc-gtk-theme
+aspnet-runtime
 asusctl
 base
 base-devel
@@ -10,7 +11,9 @@ bat
 brightnessctl
 btop
 btrfs-progs
+catppuccin-cursors-mocha
 dolphin
+dotnet-sdk
 dunst
 efibootmgr
 eza
@@ -39,6 +42,7 @@ linux-lts
 man-db
 nano
 neovim
+networkmanager
 openssh
 paru
 paru-debug
@@ -65,6 +69,7 @@ tmux
 ttf-font-awesome
 ttf-jetbrains-mono-nerd
 ttf-nerd-fonts-symbols
+unzip
 uwsm
 vim
 vivaldi
@@ -88,5 +93,7 @@ xf86-video-nouveau
 xf86-video-vmware
 xorg-server
 xorg-xinit
+zen-browser-bin
+zoxide
 zram-generator
 zsh
