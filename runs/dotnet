@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+paru -S --needed --noconfirm dotnet-sdk-9.0 aspnet-runtime-9.0
+pushd "$HOME"
+dotnet new tool-manifest
+dotnet tool install -g csharpier
+popd
+
