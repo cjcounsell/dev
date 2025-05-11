@@ -14,12 +14,13 @@
   "modules-right": [
     "pulseaudio",
     "backlight",
+    "power-profiles-daemon",
     "battery",
     "network",
     // "cpu",
     // "memory",
     "tray",
-    "custom/lock",
+    // "custom/lock",
     "custom/power"
   ]
 }

@@ -42,6 +42,7 @@
 #tray,
 #backlight,
 #clock,
+#power-profiles-daemon,
 #battery,
 #pulseaudio,
 #network,
@@ -73,6 +74,10 @@
 }
 
 #battery.warning:not(.charging) {
+  color: @peach;
+}
+
+#battery.critical:not(.charging) {
   color: @red;
 }
 
