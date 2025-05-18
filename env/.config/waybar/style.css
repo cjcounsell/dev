@@ -12,30 +12,24 @@
 #waybar {
   background: transparent;
   color: @text;
-  margin: 2px 2px;
 }
 
 #workspaces {
-  border-radius: 5px;
-  margin: 5px;
+  margin: 5px 0;
   background: @surface0;
-  margin-left: 1rem;
 }
 
 #workspaces button {
   color: @lavender;
-  border-radius: 5px;
   padding: 0.4rem;
 }
 
 #workspaces button.active {
   color: @sky;
-  border-radius: 5px;
 }
 
 #workspaces button:hover {
   color: @sapphire;
-  border-radius: 5px;
 }
 
 #custom-music,
@@ -56,13 +50,10 @@
 }
 
 #memory {
-  /* border-radius: 0px 5px 5px 0px; */
 }
 
 #clock {
   color: @blue;
-  border-radius: 5px;
-  margin-right: 1rem;
 }
 
 #battery {
@@ -92,13 +83,10 @@
 
 #pulseaudio {
   color: @maroon;
-  border-radius: 5px 0px 0px 5px;
-  margin-left: 1rem;
 }
 
 #custom-music {
   color: @mauve;
-  border-radius: 5px;
   margin-right: 0.5rem;
 }
 
@@ -108,8 +96,6 @@
 }
 
 #custom-power {
-  margin-right: 1rem;
-  border-radius: 0px 5px 5px 0px;
   color: @red;
 }
 
