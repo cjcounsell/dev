@@ -1,4 +1,21 @@
 #!/usr/bin/env bash
 
-sudo pacman -S --noconfirm --needed neovim
+set -euo pipefail
 
+# Source OS detection script
+source ../utils/os-detect.sh
+
+os=$(detect_os)
+
+case "$os" in
+arch)
+  sudo pacman -S --noconfirm --needed neovim
+  ;;
+ubuntu)
+  pushd "$HOME"
+  curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz
+  sudo rm -rf /opt/nvim
+  sudo tar -C /opt -xzf nvim-linux-x86_64.tar.gz
+  popd
+  ;;
+esac

@@ -1,8 +1,20 @@
 #!/usr/bin/env bash
 
-paru -S --needed --noconfirm dotnet-sdk-9.0 aspnet-runtime-9.0
+source ../utils/os-detect.sh
+
+os=$(detect_os)
+
+case "$os" in
+arch)
+  paru -S --needed --noconfirm dotnet-sdk-9.0 aspnet-runtime-9.0
+  ;;
+ubuntu)
+  sudo apt-get update &&
+    sudo apt-get install -y dotnet-sdk-9.0 dotnet-sdk-8.0 aspnetcore-runtime-9.0 aspnetcore-runtime-8.0
+  ;;
+esac
+
 pushd "$HOME"
 dotnet new tool-manifest
 dotnet tool install -g csharpier
 popd
-

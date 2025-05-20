@@ -1,14 +1,38 @@
 #!/usr/bin/env bash
 
-paru -S --needed --noconfirm openssh
+set -euo pipefail
+
+# Source OS detection script
+source ../utils/os-detect.sh
+
+os=$(detect_os)
+
+case "$os" in
+arch)
+  paru -S --needed --noconfirm openssh
+  ;;
+ubuntu)
+  sudo apt-get update
+  sudo apt-get install -y openssh-client
+  ;;
+esac
+
+# Common setup for both distros
 [[ -d "$HOME/personal/ansible" ]] && rm -rf "$HOME/personal/ansible"
 git clone https://github.com/cjcounsell/ansible "$HOME/personal/ansible"
 pushd "$HOME/personal/ansible"
 rm -rf "$HOME/.ssh" && cp -r .ssh ~
-ansible-vault decrypt "$HOME/.ssh/id_ed25519"
+item_id=$(ansible-vault decrypt "$HOME/.ssh/id_ed25519" --output -)
+bw login --check || bw login
+BW_SESSION=$(bw unlock --raw)
+export BW_SESSION
+bw get item "$item_id" | jq -r '.sshKey.privateKey' > "$HOME/.ssh/id_ed25519"
+chmod 600 "$HOME/.ssh/id_ed25519"
+bw get item "$item_id" | jq -r '.sshKey.publicKey' > "$HOME/.ssh/id_ed25519.pub"
+chmod 644 "$HOME/.ssh/id_ed25519.pub"
 eval $(ssh-agent -s)
-ssh-add $HOME/.ssh/id_ed25519
+ssh-add "$HOME/.ssh/id_ed25519"
 
-pushd $HOME/personal/dev
+pushd "$HOME/personal/dev"
 git remote set-url origin git@github.com:cjcounsell/dev
 popd

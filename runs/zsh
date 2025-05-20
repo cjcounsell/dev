@@ -1,8 +1,27 @@
 #!/usr/bin/env bash
 
-sudo pacman -S --noconfirm zsh starship
+set -euo pipefail
+
+# Source OS detection script
+source ../utils/os-detect.sh
+
+os=$(detect_os)
+
+case "$os" in
+arch)
+  sudo pacman -S --noconfirm zsh starship
+  ;;
+ubuntu)
+  sudo apt-get update
+  sudo apt-get install -y zsh
+  # Install starship
+  curl -sS https://starship.rs/install.sh | sh -s -- -y
+  ;;
+esac
+
+# Common setup for both distros
 hash -r
-chsh -s $(which zsh)
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+chsh -s "$(which zsh)"
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 [[ -d "$HOME/.zsh/zsh-autosuggestions" ]] && rm -rf "$HOME/.zsh/zsh-autosuggestions"
 git clone https://github.com/zsh-users/zsh-autosuggestions ~/.zsh/zsh-autosuggestions

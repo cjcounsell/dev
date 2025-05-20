@@ -1,3 +1,18 @@
 #!/usr/bin/env bash
 
-paru -S --noconfirm --needed bat curl eza fzf fd lazygit openssh ripgrep tldr vim unzip wget wl-clipboard zoxide
+set -euo pipefail
+
+source ../utils/os-detect.sh
+
+os=$(detect_os)
+
+case "$os" in
+arch)
+  paru -S --noconfirm --needed bat curl eza fzf fd jq lazygit openssh ripgrep tldr vim unzip wget wl-clipboard zoxide
+  ;;
+ubuntu)
+  sudo apt-get update
+  sudo apt-get install -y bat curl exa fzf fd-find jq lazygit openssh-client ripgrep tldr vim unzip wget wl-clipboard zoxide
+  ln -s $(which fdfind) ~/.local/bin/fd
+  ;;
+esac

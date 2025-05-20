@@ -2,22 +2,33 @@
 
 set -euo pipefail
 
-# Install dependencies
-sudo pacman -S --needed --noconfirm base-devel git
+source ../utils/os-detect.sh
 
-# Remove existing paru
-if command -v paru >/dev/null 2>&1; then
+os=$(detect_os)
+
+case "$os" in
+arch)
+  sudo pacman -S --needed --noconfirm base-devel git
+
+  # Remove existing paru
+  if command -v paru >/dev/null 2>&1; then
     paru -R --noconfirm paru
-fi
+  fi
 
-# Remove existing paru directory
-paru_dir="$HOME/paru"
-[[ -d "$paru_dir" ]] && rm -rf "$paru_dir"
+  # Remove existing paru directory
+  paru_dir="$HOME/paru"
+  [[ -d "$paru_dir" ]] && rm -rf "$paru_dir"
 
-# Install paru
-git clone https://aur.archlinux.org/paru.git "$paru_dir"
-pushd "$paru_dir"
-makepkg -si
-popd
+  # Install paru
+  git clone https://aur.archlinux.org/paru.git "$paru_dir"
+  pushd "$paru_dir"
+  makepkg -si --noconfirm
+  popd
 
-paru -S --noconfirm --needed ansible-core
+  paru -S --noconfirm --needed bitwarden-cli
+  ;;
+ubuntu)
+  sudo apt-get update
+  sudo snap install bw
+  ;;
+esac

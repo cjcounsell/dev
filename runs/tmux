@@ -1,3 +1,18 @@
 #!/usr/bin/env bash
 
-paru -S --noconfirm --needed tmux
+set -euo pipefail
+
+# Source OS detection script
+source ../utils/os-detect.sh
+
+os=$(detect_os)
+
+case "$os" in
+arch)
+  paru -S --noconfirm --needed tmux
+  ;;
+ubuntu)
+  sudo apt-get update
+  sudo apt-get install -y tmux
+  ;;
+esac
