@@ -50,7 +50,7 @@
   "clock": {
     "timezone": "US/Eastern",
     "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>",
-    "format": "{:%d - %H:%M}"
+    "format": "{:%d - %I:%M %p}"
   },
   "network": {
     "format-wifi": "󰤢 ",
