@@ -13,7 +13,7 @@
             "7": "7",
             "8": "8",
             "9": "9",
-            "active": "󱓻"
+            "active": ""
         },
         "persistent-workspaces": {
             "1": [],
@@ -29,7 +29,7 @@
         "on-click": "kitty -e btop"
     },
     "clock": {
-        "format": "{:%A %H:%M}",
+        "format": "{:%d %A %H:%M}",
         "format-alt": "{:%d %B W%V %Y}",
         "tooltip": false
     },
@@ -54,7 +54,6 @@
     },
     "battery": {
         "format": "{capacity}% {icon}",
-        "format-discharging": "{icon}",
         "format-charging": "{icon}",
         "format-plugged": "",
         "format-icons": {
@@ -100,8 +99,13 @@
         "on-click": "GTK_THEME=Adwaita-dark blueberry"
     },
     "pulseaudio": {
-        "format": "",
-        "format-muted": "󰝟",
+        "format": "{icon} {volume}%",
+        "format-muted": "",
+        "format-icons": [
+            "",
+            "",
+            " "
+        ],
         "scroll-step": 5,
         "on-click": "GTK_THEME=Adwaita-dark pavucontrol",
         "tooltip-format": "Playing at {volume}%",
@@ -115,10 +119,23 @@
         "tooltip-format": "Power profile: {profile}",
         "tooltip": true,
         "format-icons": {
-            "power-saver": "󰡳",
-            "balanced": "󰊚",
-            "performance": "󰡴"
+            "power-saver": "",
+            "balanced": "",
+            "performance": ""
         }
+    },
+    "tray": {
+        "icon-size": 21,
+        "spacing": 10
+    },
+    "custom/music": {
+        "format": " {}",
+        "escape": true,
+        "interval": 5,
+        "tooltip": true,
+        "tooltip-format": "{}",
+        "exec": "playerctl metadata --format='{{ artist }} - {{ title }}'",
+        "on-click": "playerctl play-pause"
     },
     "custom/dropbox": {
         "format": "",
