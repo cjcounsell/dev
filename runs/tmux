@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # Source OS detection script
-source ../utils/os-detect.sh
+source ./utils/os-detect.sh
 
 os=$(detect_os)
 

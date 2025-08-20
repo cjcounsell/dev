@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-source ../utils/os-detect.sh
+source ./utils/os-detect.sh
 
 os=$(detect_os)
 
