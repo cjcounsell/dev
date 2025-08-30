@@ -42,9 +42,9 @@ config.window_background_opacity = 0.9
 config.audible_bell = "Disabled"
 config.window_padding = {
     left = '0.5cell',
-    right = '0cell',
-    top = '0cell',
-    bottom = '0cell',
+    right = '0.5cell',
+    top = '0.5cell',
+    bottom = '0.5cell',
 }
 
 config.keys = {
