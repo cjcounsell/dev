@@ -1,7 +1,20 @@
 #!/usr/bin/env bash
 
-[[ -d "$HOME/.nvm"  ]] && rm -rf "$HOME/.nvm"
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-\. $HOME/.nvm/nvm.sh
-nvm install 20
+set -euo pipefail
+
+# Source OS detection script
+source ./utils/os-detect.sh
+
+os=$(detect_os)
+
+case "$os" in
+arch)
+  sudo pacman -S mise
+  ;;
+ubuntu)
+  ;;
+esac
+
+sudo pacman -S mise
+mise use -g node@24
 npm -g i neovim

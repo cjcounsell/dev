@@ -21,7 +21,7 @@ esac
 
 # Common setup for both distros
 hash -r
-chsh -s /usr/bin/zsh
+chsh -s /bin/zsh
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 [[ -d "$HOME/.zsh/zsh-autosuggestions" ]] && rm -rf "$HOME/.zsh/zsh-autosuggestions"
 git clone https://github.com/zsh-users/zsh-autosuggestions ~/.zsh/zsh-autosuggestions
