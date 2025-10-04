@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 
 # Initialize Oh My Zsh with plugins
-plugins=(git)
+plugins=(git mise)
 [[ -f "$ZSH/oh-my-zsh.sh" ]] && source "$ZSH/oh-my-zsh.sh"
 
 # Source external configuration files if they exist
