@@ -1,60 +1,32 @@
 #!/usr/bin/env bash
 
-# Exit on error
-set -e
-
-# Check if CODE_DIRS is set
-if [[ -z "$CODE_DIRS" ]]; then
-    echo "Error: CODE_DIRS environment variable is not set" >&2
-    exit 1
-fi
-
 IFS=':' read -r -a code_dirs <<< "$CODE_DIRS"
 
 if [[ $# -eq 1 ]]; then
     selected=$1
 else
-    # Check if fzf is available
-    if ! command -v fzf &> /dev/null; then
-        echo "Error: fzf is not installed" >&2
-        exit 1
-    fi
-    
-    # Filter to only existing directories
-    existing_dirs=()
-    for dir in "${code_dirs[@]}"; do
-        [[ -d "$dir" ]] && existing_dirs+=("$dir")
-    done
-    
-    if [[ ${#existing_dirs[@]} -eq 0 ]]; then
-        echo "Error: No valid directories found in CODE_DIRS" >&2
-        exit 1
-    fi
-    
-    selected=$(find "${existing_dirs[@]}" -mindepth 1 -maxdepth 1 -type d | fzf)
+    selected=$(find "${code_dirs[@]}" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | fzf)
 fi
 
-# Exit if no selection made (user cancelled fzf)
-[[ -z "$selected" ]] && exit 0
-
-# Sanitize session name: replace dots and other problematic chars with underscores
-selected_name=$(basename "$selected" | tr '.:-' '_')
-
-# Create new session if tmux isn't running at all
-if [[ -z "$TMUX" ]] && ! tmux info &> /dev/null; then
-    tmux new-session -s "$selected_name" -c "$selected"
+if [[ -z $selected ]]; then
     exit 0
 fi
 
-# Create session if it doesn't exist
-if ! tmux has-session -t="$selected_name" 2> /dev/null; then
-    tmux new-session -ds "$selected_name" -c "$selected"
+selected_name=$(basename "$selected" | tr . _)
+tmux_running=$(pgrep tmux)
+
+if [[ -z $TMUX ]] && [[ -z $tmux_running ]]; then
+    tmux new-session -s $selected_name -c $selected
+    exit 0
 fi
 
-# Attach or switch depending on context
-if [[ -z "$TMUX" ]]; then
-    tmux attach-session -t "$selected_name"
+if ! tmux has-session -t=$selected_name 2> /dev/null; then
+    tmux new-session -ds $selected_name -c $selected
+fi
+
+if [[ -z $TMUX ]]; then
+    tmux attach-session -t $selected_name
 else
-    tmux switch-client -t "$selected_name"
+    tmux switch-client -t $selected_name
 fi
 
