@@ -116,13 +116,13 @@ cat > "$TMUX_THEME_CONF" << EOF
 # Generated: $(date)
 
 # Color Variables
-bg="default"
-default_fg="$THEME_FG"
-session_fg="$THEME_GREEN"
-session_selection_fg="$THEME_BLACK"
-session_selection_bg="$THEME_BLUE"
-active_window_fg="$THEME_CYAN"
-active_pane_border="$THEME_FG"
+set -g @bg "default"
+set -g @default_fg "$THEME_FG"
+set -g @session_fg "$THEME_GREEN"
+set -g @session_selection_fg "$THEME_BLACK"
+set -g @session_selection_bg "$THEME_BLUE"
+set -g @active_window_fg "$THEME_CYAN"
+set -g @active_pane_border "$THEME_FG"
 EOF
 
 echo "✓ Tmux theme colors generated from $THEME_TYPE"
