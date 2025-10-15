@@ -1,18 +1,11 @@
 #!/usr/bin/env bash
 
-source ./utils/os-detect.sh
+if ! command -v mise >/dev/null 2>&1; then
+    echo "mise is not installed or not in PATH."
+    exit 1
+fi
 
-os=$(detect_os)
-
-case "$os" in
-arch)
-    paru -S --needed --noconfirm dotnet-sdk-9.0 aspnet-runtime-9.0
-    ;;
-ubuntu)
-    sudo apt-get update &&
-        sudo apt-get install -y dotnet-sdk-9.0 dotnet-sdk-8.0 aspnetcore-runtime-9.0 aspnetcore-runtime-8.0
-    ;;
-esac
+mise use -g dotnet@9
 
 pushd "$HOME"
 dotnet new tool-manifest

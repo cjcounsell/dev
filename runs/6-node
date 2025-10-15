@@ -2,19 +2,10 @@
 
 set -euo pipefail
 
-# Source OS detection script
-source ./utils/os-detect.sh
+if ! command -v mise >/dev/null 2>&1; then
+    echo "mise is not installed or not in PATH."
+    exit 1
+fi
 
-os=$(detect_os)
-
-case "$os" in
-arch)
-  sudo pacman -S mise
-  ;;
-ubuntu)
-  ;;
-esac
-
-sudo pacman -S mise
 mise use -g node@24
 npm -g i neovim
