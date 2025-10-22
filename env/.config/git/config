@@ -1,6 +1,16 @@
+[alias]
+	co = checkout
+	br = branch
+	ci = commit
+	st = status
+[pull]
+	rebase = true
+[init]
+	defaultBranch = master
 [user]
     email = cjcounsell@gmail.com
     name = Chase Counsell
 
 [includeIf "gitdir:~/work/"]
     path = ~/.gitconfig-work
+
