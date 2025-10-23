@@ -6,6 +6,7 @@ if command -v batcat >/dev/null 2>&1; then
     alias bat="batcat"
 fi
 alias cat="bat"
+gclp() { git clone git@github.com:cjcounsell/"$1".git; }
 alias lg="lazygit"
 alias ls="eza --icons -l -T -L=1"
 alias lzd="lazydocker"
