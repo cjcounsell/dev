@@ -22,7 +22,7 @@ esac
 git clone https://github.com/cjcounsell/ansible "$HOME/personal/ansible"
 pushd "$HOME/personal/ansible"
 rm -rf "$HOME/.ssh" && mkdir "$HOME/.ssh"
-item_id=$(ansible-vault decrypt "./keys/bw" --output -)
+item_id="9310c75b-a4c1-451c-8905-b27e01846f15"
 bw login --check || bw login
 BW_SESSION=$(bw unlock --raw)
 export BW_SESSION
