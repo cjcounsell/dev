@@ -11,7 +11,11 @@ export DOTFILES="$HOME/.dotfiles"
 export DOTNET_ROOT="$HOME/.dotnet"
 export PNPM_HOME="$HOME/.local/share/pnpm"
 export CODE_DIRS="$HOME:$HOME/personal:$HOME/work:$HOME/vaults"
-export PHP_INI_SCAN_DIR="/home/cjcounsell/.config/herd-lite/bin:$PHP_INI_SCAN_DIR"
+export PHP_INI_SCAN_DIR="$HOME/.config/herd-lite/bin:$PHP_INI_SCAN_DIR"
+
+# Bitwarden item IDs for setup scripts
+export BW_SSH_KEY_ID="9310c75b-a4c1-451c-8905-b27e01846f15"
+export BW_INTELEPHENSE_ID="421bb870-b923-44e6-b2fe-b38c0009bfe3"
 
 # Ensure unique PATH entries
 typeset -U PATH path

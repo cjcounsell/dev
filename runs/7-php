@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 /bin/bash -c "$(curl -fsSL https://php.new/install/linux/8.4)"
 
-item_id="421bb870-b923-44e6-b2fe-b38c0009bfe3"
-bw get item "$item_id" | jq -r '.fields[] | select(.name=="Licence Key") | .value' > "$HOME/intelephense/licence.txt"
+[[ -n "${BW_INTELEPHENSE_ID:-}" ]] || { echo "Error: BW_INTELEPHENSE_ID not set" >&2; exit 1; }
+mkdir -p "$HOME/intelephense"
+bw get item "$BW_INTELEPHENSE_ID" | jq -r '.fields[] | select(.name=="Licence Key") | .value' > "$HOME/intelephense/licence.txt"

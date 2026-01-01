@@ -22,13 +22,13 @@ esac
 git clone https://github.com/cjcounsell/ansible "$HOME/personal/ansible"
 pushd "$HOME/personal/ansible"
 rm -rf "$HOME/.ssh" && mkdir "$HOME/.ssh"
-item_id="9310c75b-a4c1-451c-8905-b27e01846f15"
+[[ -n "${BW_SSH_KEY_ID:-}" ]] || { echo "Error: BW_SSH_KEY_ID not set" >&2; exit 1; }
 bw login --check || bw login
 BW_SESSION=$(bw unlock --raw)
 export BW_SESSION
-bw get item "$item_id" | jq -r '.sshKey.privateKey' > "$HOME/.ssh/id_ed25519"
+bw get item "$BW_SSH_KEY_ID" | jq -r '.sshKey.privateKey' > "$HOME/.ssh/id_ed25519"
 chmod 600 "$HOME/.ssh/id_ed25519"
-bw get item "$item_id" | jq -r '.sshKey.publicKey' > "$HOME/.ssh/id_ed25519.pub"
+bw get item "$BW_SSH_KEY_ID" | jq -r '.sshKey.publicKey' > "$HOME/.ssh/id_ed25519.pub"
 chmod 644 "$HOME/.ssh/id_ed25519.pub"
 eval $(ssh-agent -s)
 ssh-add "$HOME/.ssh/id_ed25519"
