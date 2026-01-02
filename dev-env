@@ -1,110 +1,98 @@
 #!/usr/bin/env bash
 
-dry_run="0"
+set -euo pipefail
 
-# Check XDG_CONFIG_HOME
-if [[ -z "$XDG_CONFIG_HOME" ]]; then
-  echo "XDG_CONFIG_HOME not defined"
-  echo "Using ~/.config"
+DRY_RUN="0"
+
+if [[ -z "${XDG_CONFIG_HOME:-}" ]]; then
+  echo "XDG_CONFIG_HOME not defined, using ~/.config"
   XDG_CONFIG_HOME="$HOME/.config"
 fi
 
-# Check DEV_ENV
-if [[ -z "$DEV_ENV" ]]; then
-  echo "DEV_ENV needs to be set"
+if [[ -z "${DEV_ENV:-}" ]]; then
+  echo "DEV_ENV needs to be set" >&2
   exit 1
 fi
 
-log() {
-  if [[ "$dry_run" == "1" ]]; then
-    echo "[DRY_RUN]: $1"
-  else
-    echo "$1"
-  fi
-}
+source "$DEV_ENV/utils/common.sh"
 
-log "env: $DEV_ENV"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry|--dry-run)
+      DRY_RUN="1"
+      ;;
+    --help|-h)
+      echo "Usage: dev-env [OPTIONS]"
+      echo ""
+      echo "Deploy dev environment configs to system"
+      echo ""
+      echo "Options:"
+      echo "  --dry, --dry-run  Show what would be done without making changes"
+      echo "  --help, -h        Show this help message"
+      echo ""
+      echo "Environment:"
+      echo "  DEV_ENV           Required. Path to dev environment repo"
+      echo "  XDG_CONFIG_HOME   Optional. Defaults to ~/.config"
+      echo "  BACKUP_DIR        Optional. Defaults to ~/.config-backups"
+      exit 0
+      ;;
+    *)
+      log_error "Unknown option: $1"
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+export DRY_RUN
+
+log_info "env: $DEV_ENV"
+
+require_dir "$DEV_ENV/env"
+require_disk_space 50
+init_backup_session "dev-env-$(date +%Y%m%d-%H%M%S)"
 
 update_files() {
   local src="$1" dest="$2"
-  [[ -d "$src" ]] || {
-    log "Source dir $src missing"
-    exit 1
-  }
-  [[ -w "$dest" ]] || {
-    log "No write permission for $dest"
-    exit 1
-  }
 
-  log "Copying over files from: $src"
-  pushd "$src" >/dev/null || {
-    log "pushd failed"
-    exit 1
-  }
+  require_dir "$src"
+  require_writable "$dest"
+
+  log_info "Copying files from: $src"
+  pushd "$src" >/dev/null
 
   local configs
   configs=$(find . -mindepth 1 -maxdepth 1 -type d)
   for c in $configs; do
     local directory="${dest%/}/${c#./}"
-    log "    Removing: rm -rf \"$directory\""
+    log_debug "  Processing: $directory"
 
-    if [[ "$dry_run" == "0" ]]; then
-      rm -rf "$directory" || {
-        log "Remove failed for $directory"
-        exit 1
-      }
-    fi
+    safe_remove "$directory"
 
-    log "    Copying env: cp -r \"$c\" \"$dest\""
-    if [[ "$dry_run" == "0" ]]; then
-      cp -r "./$c" "$dest" || {
-        log "Copy failed for $c"
-        exit 1
-      }
+    if [[ "$DRY_RUN" == "0" ]]; then
+      cp -r "./$c" "$dest" || error_exit "Copy failed for $c"
+    else
+      log_dry "  Would copy: $c -> $dest"
     fi
   done
 
-  popd >/dev/null || {
-    log "popd failed"
-    exit 1
-  }
+  popd >/dev/null
 }
 
 copy() {
   local src="$1" dest="$2"
-  [[ -f "$src" ]] || {
-    log "Source file $src missing"
-    exit 1
-  }
-  [[ -w "$(dirname "$dest")" ]] || {
-    log "No write permission for $(dirname "$dest")"
-    exit 1
-  }
 
-  if [[ -e "$dest" ]]; then
-    log "Removing: $dest"
-    if [[ "$dry_run" == "0" ]]; then
-      rm "$dest" || {
-        log "Remove failed for $dest"
-        exit 1
-      }
-    fi
-  fi
+  require_file "$src"
 
-  log "Copying: $src to $dest"
-  if [[ "$dry_run" == "0" ]]; then
-    cp "$src" "$dest" || {
-      log "Copy failed for $src"
-      exit 1
-    }
-  fi
+  local dest_parent
+  dest_parent="$(dirname "$dest")"
+  require_writable "$dest_parent"
+
+  safe_copy "$src" "$dest"
 }
 
-# Execute updates
-
-# Disable hyprland auto reloading
-if [[ "$dry_run" == "0" ]] && command -v hyprctl >/dev/null; then
-  hyprctl keyword misc:disable_autoreload true
+if [[ "$DRY_RUN" == "0" ]] && command -v hyprctl >/dev/null 2>&1; then
+  hyprctl keyword misc:disable_autoreload true 2>/dev/null || true
 fi
 
 update_files "$DEV_ENV/env/.config" "$XDG_CONFIG_HOME"
@@ -117,11 +105,14 @@ copy "$DEV_ENV/env/.zshrc" "$HOME/.zshrc"
 copy "$DEV_ENV/env/.config/git/config" "$HOME/.config/git/config"
 copy "$DEV_ENV/env/.config/starship.toml" "$XDG_CONFIG_HOME/starship.toml"
 
-# Reload hyprland
-if [[ "$dry_run" == "0" ]] && command -v hyprctl >/dev/null; then
-  hyprctl reload >/dev/null 2>&1 || {
-    log "hyprctl reload failed"
-    exit 1
-  }
-  hyprctl keyword misc:disable_autoreload false
+if [[ "$DRY_RUN" == "0" ]] && command -v hyprctl >/dev/null 2>&1; then
+  hyprctl reload >/dev/null 2>&1 || log_warn "hyprctl reload failed"
+  hyprctl keyword misc:disable_autoreload false 2>/dev/null || true
+fi
+
+cleanup_old_backups 5
+
+log_success "Dev environment deployed successfully"
+if [[ -n "${_BACKUP_SESSION_DIR:-}" ]]; then
+  log_info "Backup saved to: $_BACKUP_SESSION_DIR"
 fi

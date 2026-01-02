@@ -1,21 +1,48 @@
 #!/usr/bin/env bash
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || exit 1
+set -euo pipefail
 
-if [[ -z "$DEV_ENV" ]]; then
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ -z "${DEV_ENV:-}" ]]; then
   echo "Error: DEV_ENV environment variable is required" >&2
   exit 1
 fi
 
 export DEV_ENV
 
+source "$DEV_ENV/utils/common.sh"
+
 grep_pattern=""
-dry_run=0
+DRY_RUN=0
+stop_on_error=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --dry)
-      dry_run=1
+    --dry|--dry-run)
+      DRY_RUN=1
+      ;;
+    --stop-on-error)
+      stop_on_error=1
+      ;;
+    --help|-h)
+      echo "Usage: run [OPTIONS] [PATTERN]"
+      echo ""
+      echo "Execute setup scripts from runs/ directory"
+      echo ""
+      echo "Options:"
+      echo "  --dry, --dry-run   Show what would be run without executing"
+      echo "  --stop-on-error    Stop execution if any script fails"
+      echo "  --help, -h         Show this help message"
+      echo ""
+      echo "Arguments:"
+      echo "  PATTERN            Filter scripts by name (e.g., '3-zsh', 'node')"
+      echo ""
+      echo "Examples:"
+      echo "  run                Run all scripts"
+      echo "  run 3-zsh          Run only scripts matching '3-zsh'"
+      echo "  run --dry node     Preview what 'node' scripts would run"
+      exit 0
       ;;
     *)
       grep_pattern="$1"
@@ -24,33 +51,69 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-log() {
-  if [[ $dry_run -eq 1 ]]; then
-    echo "[DRY_RUN]: $1"
-  else
-    echo "$1"
-  fi
-}
+export DRY_RUN
 
-log "RUN: env: $DEV_ENV -- grep: $grep_pattern"
+log_info "RUN: env=$DEV_ENV filter=${grep_pattern:-<all>}"
 
-# Find executable files in runs directory
 runs_dir="$script_dir/runs"
-if [[ ! -d "$runs_dir" ]]; then
-  echo "Error: Directory $runs_dir not found" >&2
-  exit 1
+require_dir "$runs_dir"
+
+mapfile -t scripts < <(find "$runs_dir" -mindepth 1 -maxdepth 1 -type f -executable | sort)
+
+if [[ ${#scripts[@]} -eq 0 ]]; then
+  log_warn "No executable scripts found in $runs_dir"
+  exit 0
 fi
 
-mapfile -t scripts < <(find "$runs_dir" -mindepth 1 -maxdepth 1 -type f -executable)
+total=0
+skipped=0
+success=0
+failed=0
 
 for s in "${scripts[@]}"; do
-  if [[ -n "$grep_pattern" && "$(basename "$s")" != *"$grep_pattern"* ]]; then
-    log "grep \"$grep_pattern\" filtered out $s"
+  script_name="$(basename "$s")"
+
+  if [[ -n "$grep_pattern" && "$script_name" != *"$grep_pattern"* ]]; then
+    log_debug "Filtered out: $script_name (pattern: $grep_pattern)"
+    ((skipped++)) || true
     continue
   fi
 
-  log "running script: $s"
-  if [[ $dry_run -eq 0 ]]; then
-    "$s" || echo "Error: Script $s failed" >&2
+  ((total++)) || true
+
+  if [[ $DRY_RUN -eq 1 ]]; then
+    log_dry "Would run: $s"
+    ((success++)) || true
+    continue
+  fi
+
+  log_info "Running: $script_name"
+
+  if "$s"; then
+    log_success "Completed: $script_name"
+    ((success++)) || true
+  else
+    exit_code=$?
+    log_error "Failed: $script_name (exit code: $exit_code)"
+    ((failed++)) || true
+
+    if [[ $stop_on_error -eq 1 ]]; then
+      log_error "Stopping due to --stop-on-error"
+      break
+    fi
   fi
 done
+
+echo ""
+log_info "Summary: $total scripts processed"
+log_info "  Success: $success"
+if [[ $failed -gt 0 ]]; then
+  log_error "  Failed: $failed"
+fi
+if [[ $skipped -gt 0 ]]; then
+  log_debug "  Skipped (filtered): $skipped"
+fi
+
+if [[ $failed -gt 0 ]]; then
+  exit 1
+fi
