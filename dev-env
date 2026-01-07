@@ -99,7 +99,6 @@ update_files "$DEV_ENV/env/.config" "$XDG_CONFIG_HOME"
 update_files "$DEV_ENV/env/.local" "$HOME/.local"
 
 copy "$DEV_ENV/env/.aliases" "$HOME/.aliases"
-copy "$DEV_ENV/env/.zprofile" "$HOME/.zprofile"
 copy "$DEV_ENV/env/.zshenv" "$HOME/.zshenv"
 copy "$DEV_ENV/env/.zshrc" "$HOME/.zshrc"
 copy "$DEV_ENV/env/.config/git/config" "$HOME/.config/git/config"

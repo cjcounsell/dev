@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env zsh
 
 alias ani-cli="ani-cli --vlc"
 alias air="$HOME/go/bin/air"
