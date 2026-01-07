@@ -42,7 +42,7 @@ _should_log() {
 }
 
 log_debug() {
-    _should_log "DEBUG" && echo -e "${_GRAY}[DEBUG]${_NC} $*"
+    _should_log "DEBUG" && echo -e "${_GRAY}[DEBUG]${_NC} $*" || true
 }
 
 log_info() {

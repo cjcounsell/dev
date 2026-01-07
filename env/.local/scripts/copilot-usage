@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+
+# Copilot Premium Request Usage Tracker
+# Calculates if you're on pace to run out before month end (weekdays only)
+
+set -euo pipefail
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") <current_usage_percent>
+
+Calculate if you're overusing or underusing your GitHub Copilot premium requests.
+
+Arguments:
+    current_usage_percent   Your current usage percentage (0-100+)
+                            Find this in: GitHub Settings > Copilot > Billing
+                            Or in your IDE's Copilot panel
+
+Examples:
+    $(basename "$0") 45      # Check if 45% usage is on track
+    $(basename "$0") 120     # Works with overage percentages too
+
+EOF
+    exit 1
+}
+
+# Validate input
+if [[ $# -ne 1 ]]; then
+    usage
+fi
+
+if ! [[ "$1" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+    echo -e "${RED}Error: Usage percentage must be a number${NC}" >&2
+    exit 1
+fi
+
+CURRENT_USAGE="$1"
+
+# Get current date info
+CURRENT_DAY=$(date +%d)
+CURRENT_MONTH=$(date +%m)
+CURRENT_YEAR=$(date +%Y)
+CURRENT_DOW=$(date +%u) # 1=Monday, 7=Sunday
+
+# Calculate days in current month
+DAYS_IN_MONTH=$(date -d "$CURRENT_YEAR-$CURRENT_MONTH-01 +1 month -1 day" +%d)
+
+# Function to count weekdays in a range
+count_weekdays() {
+    local start_day=$1
+    local end_day=$2
+    local month=$3
+    local year=$4
+    local count=0
+
+    for day in $(seq "$start_day" "$end_day"); do
+        dow=$(date -d "$year-$month-$(printf '%02d' $day)" +%u 2>/dev/null || echo "0")
+        if [[ "$dow" -ge 1 && "$dow" -le 5 ]]; then
+            ((count++))
+        fi
+    done
+    echo "$count"
+}
+
+# Count weekdays from start of month to today (inclusive)
+WEEKDAYS_ELAPSED=$(count_weekdays 1 "$CURRENT_DAY" "$CURRENT_MONTH" "$CURRENT_YEAR")
+
+# Count total weekdays in the month
+TOTAL_WEEKDAYS=$(count_weekdays 1 "$DAYS_IN_MONTH" "$CURRENT_MONTH" "$CURRENT_YEAR")
+
+# Count remaining weekdays (not including today since we've already used some today)
+WEEKDAYS_REMAINING=$((TOTAL_WEEKDAYS - WEEKDAYS_ELAPSED))
+
+# Calculate expected usage percentage at this point
+EXPECTED_USAGE=$(echo "scale=2; ($WEEKDAYS_ELAPSED / $TOTAL_WEEKDAYS) * 100" | bc)
+
+# Calculate the difference
+DIFF=$(echo "scale=2; $CURRENT_USAGE - $EXPECTED_USAGE" | bc)
+
+# Calculate projected end-of-month usage
+if [[ "$WEEKDAYS_ELAPSED" -gt 0 ]]; then
+    PROJECTED_USAGE=$(echo "scale=2; ($CURRENT_USAGE / $WEEKDAYS_ELAPSED) * $TOTAL_WEEKDAYS" | bc)
+else
+    PROJECTED_USAGE="0"
+fi
+
+# Calculate daily budget remaining (if they want to hit exactly 100%)
+if [[ "$WEEKDAYS_REMAINING" -gt 0 ]]; then
+    REMAINING_BUDGET=$(echo "scale=2; 100 - $CURRENT_USAGE" | bc)
+    DAILY_BUDGET=$(echo "scale=2; $REMAINING_BUDGET / $WEEKDAYS_REMAINING" | bc)
+else
+    DAILY_BUDGET="0"
+fi
+
+# Output results
+echo ""
+echo -e "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
+echo -e "${BLUE}           Copilot Premium Request Usage Analysis${NC}"
+echo -e "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
+echo ""
+echo -e "📅 ${BLUE}Date:${NC} $(date '+%B %d, %Y (%A)')"
+echo ""
+echo -e "${BLUE}── Time Progress ──${NC}"
+echo -e "   Weekdays elapsed:    ${WEEKDAYS_ELAPSED} of ${TOTAL_WEEKDAYS} ($(echo "scale=1; ($WEEKDAYS_ELAPSED / $TOTAL_WEEKDAYS) * 100" | bc)%)"
+echo -e "   Weekdays remaining:  ${WEEKDAYS_REMAINING}"
+echo ""
+echo -e "${BLUE}── Usage Analysis ──${NC}"
+echo -e "   Current usage:       ${CURRENT_USAGE}%"
+echo -e "   Expected at today:   ${EXPECTED_USAGE}%"
+echo -e "   Difference:          ${DIFF}%"
+echo ""
+echo -e "${BLUE}── Projections ──${NC}"
+echo -e "   Projected EOM usage: ${PROJECTED_USAGE}%"
+echo -e "   Daily budget left:   ${DAILY_BUDGET}% per remaining weekday"
+echo ""
+
+# Status indicator
+echo -e "${BLUE}── Status ──${NC}"
+
+# Compare using bc for floating point
+IS_OVER=$(echo "$CURRENT_USAGE > $EXPECTED_USAGE" | bc)
+IS_WAY_OVER=$(echo "$DIFF > 10" | bc)
+IS_WAY_UNDER=$(echo "$DIFF < -10" | bc)
+WILL_EXCEED=$(echo "$PROJECTED_USAGE > 100" | bc)
+
+if [[ "$IS_WAY_OVER" -eq 1 ]]; then
+    echo -e "   ${RED}⚠️  OVERUSING${NC} - You're ${DIFF}% ahead of pace!"
+    if [[ "$WILL_EXCEED" -eq 1 ]]; then
+        echo -e "   ${RED}📈 At this rate, you'll hit ~${PROJECTED_USAGE}% by month end${NC}"
+        OVERAGE=$(echo "scale=0; $PROJECTED_USAGE - 100" | bc)
+        echo -e "   ${YELLOW}💡 Suggestion: Reduce daily usage to stay within budget${NC}"
+    fi
+elif [[ "$IS_WAY_UNDER" -eq 1 ]]; then
+    echo -e "   ${GREEN}✨ UNDERUSING${NC} - You're $(echo "$DIFF * -1" | bc)% behind pace"
+    echo -e "   ${GREEN}📉 Plenty of headroom - use those premium features!${NC}"
+elif [[ "$IS_OVER" -eq 1 ]]; then
+    echo -e "   ${YELLOW}📊 SLIGHTLY AHEAD${NC} - ${DIFF}% over expected"
+    if [[ "$WILL_EXCEED" -eq 1 ]]; then
+        echo -e "   ${YELLOW}⚡ Projected to hit ${PROJECTED_USAGE}% - consider slowing down${NC}"
+    else
+        echo -e "   ${GREEN}👍 Still on track to finish under 100%${NC}"
+    fi
+else
+    echo -e "   ${GREEN}✅ ON TRACK${NC} - Usage is right where it should be"
+fi
+
+echo ""
+echo -e "${BLUE}═══════════════════════════════════════════════════════════════${NC}"
+echo ""
