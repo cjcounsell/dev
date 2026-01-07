@@ -256,8 +256,15 @@ require_file() {
 
 require_writable() {
     local path="$1"
+    local original_path="$path"
+
+    # Walk up to find existing ancestor
+    while [[ ! -e "$path" && "$path" != "/" ]]; do
+        path="$(dirname "$path")"
+    done
+
     if [[ ! -w "$path" ]]; then
-        error_exit "No write permission: $path"
+        error_exit "No write permission: $original_path"
     fi
 }
 
