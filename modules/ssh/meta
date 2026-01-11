@@ -1,0 +1,3 @@
+DESCRIPTION="SSH keys from Bitwarden"
+DEPENDS=(cli-tools secrets)
+PROFILES=()

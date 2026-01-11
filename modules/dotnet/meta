@@ -1,0 +1,3 @@
+DESCRIPTION=".NET SDK via mise"
+DEPENDS=(cli-tools)
+PROFILES=()

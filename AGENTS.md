@@ -1,53 +1,60 @@
 # Agent Guidelines
 
-This repository contains personal development environment configuration and setup scripts
-for Linux systems (Arch and Ubuntu). It manages dotfiles, shell configs, and software
-installation across machines using a modular, scriptable approach.
+Personal dev environment manager for Linux (Arch/Ubuntu). Manages dotfiles, shell configs,
+and software installation using modular bash scripts with profile-based configuration.
 
 ## Repository Structure
 
 ```
 dev/
-├── env/                    # Configuration files to deploy to $HOME
-│   ├── .config/            # XDG config files (nvim, tmux, kitty, hyprland, etc.)
-│   ├── .local/scripts/     # Custom shell scripts added to PATH
-│   └── .*                   # Dotfiles (.aliases, .zshrc, .zshenv, .zprofile)
-├── runs/                   # Numbered executable setup scripts (0-dev, 1-libs, etc.)
-├── utils/                  # Shared utility scripts (os-detect.sh)
-├── work/                   # Work-specific configs (git submodule, private)
-├── init                    # Initialize git submodules
-├── dev-env                 # Deploy configs to system
-└── run                     # Execute setup scripts
+├── dev                         # Main CLI entry point
+├── config/
+│   ├── packages.conf           # Package definitions by OS
+│   └── profiles/
+│       ├── wsl.conf            # WSL2 profile
+│       └── omarchy.conf        # Arch desktop profile
+├── modules/                    # Install modules
+│   ├── core/                   # Base dev tools
+│   ├── shell/                  # Zsh, Oh-My-Zsh, Starship
+│   ├── cli-tools/              # fzf, ripgrep, bat, etc.
+│   ├── ssh/                    # SSH keys from Bitwarden
+│   ├── neovim/                 # Neovim editor
+│   ├── tmux/                   # Terminal multiplexer
+│   ├── node/                   # Node.js via mise
+│   ├── php/                    # PHP via Herd
+│   ├── dotnet/                 # .NET via mise
+│   ├── desktop/                # Hyprland (omarchy only)
+│   └── secrets/                # Bitwarden CLI + secrets
+├── dotfiles/
+│   ├── common/                 # All profiles
+│   │   ├── .config/
+│   │   ├── .local/scripts/
+│   │   └── .*                  # Shell dotfiles
+│   ├── omarchy/                # Desktop-specific
+│   │   └── .config/hypr/
+│   └── work/                   # Work configs (submodule)
+├── lib/                        # Shared utilities
+│   ├── common.sh               # Logging, backup, validation
+│   ├── os.sh                   # OS detection, package manager
+│   ├── config.sh               # Profile/config loading
+│   ├── modules.sh              # Module discovery, deps
+│   └── state.sh                # Installation tracking
+└── .local/                     # Gitignored local state
+    ├── machine.conf            # Machine-specific config
+    └── state                   # What's installed
 ```
 
-## Build/Test Commands
+## CLI Commands
 
-### Setup and Deployment
 ```bash
-./init                      # Initialize git submodules (nvim config, work repo)
-./dev-env                   # Deploy all configs from env/ to system (requires DEV_ENV)
-./run [grep_pattern]        # Execute matching scripts in runs/ directory
-./run --dry [grep_pattern]  # Preview what would run without executing
-```
-
-### Running Specific Setup Scripts
-```bash
-./run 0-dev      # Install base dev tools (git, paru/apt, bitwarden-cli)
-./run 1-libs     # Install CLI utilities (bat, eza, fzf, ripgrep, lazygit, etc.)
-./run 2-ssh      # Configure SSH keys from Bitwarden
-./run 3-zsh      # Install zsh, oh-my-zsh, starship prompt
-./run 4-neovim   # Install neovim
-./run 5-tmux     # Install tmux
-./run 6-node     # Install Node.js via mise
-./run 7-php      # Install PHP via Herd
-./run 8-dotnet   # Install .NET SDK via mise
-```
-
-### Required Environment Variables
-```bash
-export DEV_ENV="/path/to/this/repo"   # Required for dev-env and run scripts
-export WORK_ENV="/path/to/work/repo"  # Required for work-env script
-export XDG_CONFIG_HOME="$HOME/.config" # Used by config scripts
+./dev                          # Show status
+./dev init                     # First-time setup (select profile)
+./dev sync                     # Deploy dotfiles
+./dev install [module...]      # Install module(s)
+./dev status                   # Show installation status
+./dev list                     # List available modules
+./dev update                   # Update system packages
+./dev doctor                   # Check for issues
 ```
 
 ## Code Style Guidelines
@@ -55,99 +62,45 @@ export XDG_CONFIG_HOME="$HOME/.config" # Used by config scripts
 ### Shell Scripts
 
 #### Shebang and Strict Mode
-- Always use `#!/usr/bin/env bash` for bash scripts
-- Always use `#!/usr/bin/env zsh` for zsh scripts
-- Use `set -euo pipefail` at the start of setup scripts for strict error handling:
-  - `-e`: Exit on error
-  - `-u`: Error on undefined variables
-  - `-o pipefail`: Fail on pipe errors
-
-#### Conditionals and Tests
 ```bash
-# CORRECT: Use double brackets
+#!/usr/bin/env bash
+set -euo pipefail
+```
+
+#### Conditionals
+```bash
 [[ -z "$VAR" ]] && echo "empty"
 [[ -d "$dir" ]] || mkdir -p "$dir"
-[[ -f "$file" ]] && source "$file"
-
-# INCORRECT: Single brackets
-[ -z "$VAR" ]  # Don't use this
 ```
 
-#### Command Existence Checks
+#### Command Checks
 ```bash
-# CORRECT: Redirect both stdout and stderr
 command -v nvim >/dev/null 2>&1 && echo "found"
-if command -v mise >/dev/null 2>&1; then
-    mise use -g node@24
-fi
-
-# INCORRECT: Missing redirects
-command -v nvim && echo "found"
 ```
 
-#### Error Handling Patterns
+#### Error Handling
 ```bash
-# Use inline error handling with || and {}
 [[ -d "$src" ]] || {
-    log "Source dir $src missing"
+    log_error "Source missing"
     exit 1
 }
-
-# Or use if statements for complex logic
-if ! git clone "$url" "$dest"; then
-    echo "Clone failed" >&2
-    exit 1
-fi
 ```
 
-#### Function Definitions
+#### Using Library Functions
 ```bash
-# Define helper functions at script top
-log() {
-    if [[ "$dry_run" == "1" ]]; then
-        echo "[DRY_RUN]: $1"
-    else
-        echo "$1"
-    fi
-}
+source "$DEV_ROOT/lib/common.sh"
+source "$DEV_ROOT/lib/os.sh"
 
-# Use local variables in functions
-update_files() {
-    local src="$1" dest="$2"
-    # ...
-}
-```
+log_info "Installing packages"
+log_error "Failed"
+log_success "Done"
 
-#### Path and Variable Handling
-```bash
-# CORRECT: Quote all variables, especially paths
-pushd "$src" >/dev/null
-cp -r "./$c" "$dest"
+require_command git
+require_dir "$path"
+safe_copy "$src" "$dest"
 
-# CORRECT: Use absolute paths or explicit relative paths
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# CORRECT: Handle array creation safely
-mapfile -t scripts < <(find "$runs_dir" -type f -executable)
-for s in "${scripts[@]}"; do
-    # ...
-done
-```
-
-#### OS Detection Pattern
-```bash
-source ./utils/os-detect.sh
-os=$(detect_os)
-
-case "$os" in
-arch)
-    paru -S --noconfirm --needed package_name
-    ;;
-ubuntu)
-    sudo apt-get update
-    sudo apt-get install -y package_name
-    ;;
-esac
+pkg_install package1 package2
+install_packages "cli"
 ```
 
 ### Lua (Neovim Config)
@@ -159,19 +112,14 @@ esac
 
 #### Style
 ```lua
--- Use vim.opt for options
 vim.opt.shiftwidth = 4
 vim.opt.tabstop = 4
-
--- Use vim.g for global variables
 vim.g.autoformat = false
 
--- Use schedule for async operations
 vim.schedule(function()
     -- ...
 end)
 
--- Add filetypes with vim.filetype.add
 vim.filetype.add({
     extension = { Tiltfile = 'starlark' },
     filename = { ["Tiltfile"] = "starlark" },
@@ -182,14 +130,12 @@ vim.filetype.add({
 
 #### Plugin Management
 ```zsh
-# Define plugins before sourcing oh-my-zsh
 plugins=(git mise)
 [[ -f "$ZSH/oh-my-zsh.sh" ]] && source "$ZSH/oh-my-zsh.sh"
 ```
 
 #### Conditional Sourcing
 ```zsh
-# Use arrays for multiple config files
 local configs=(
     "$HOME/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh"
     "$HOME/.aliases"
@@ -201,52 +147,89 @@ done
 
 #### Tool Initialization
 ```zsh
-# Check before initializing
 command -v starship >/dev/null 2>&1 && eval "$(starship init zsh)"
 command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init --cmd cd zsh)"
 ```
 
-## Git Submodules
+## Module Structure
 
-This repo uses submodules for:
-- `env/.config/nvim` - Neovim configuration (separate repo)
-- `work/` - Work-specific environment (private repo)
+Each module has:
+- `meta` - Metadata (DESCRIPTION, DEPENDS, PROFILES)
+- `install.sh` - Installation script
 
-After cloning, run `./init` to initialize and update submodules.
+```bash
+# modules/example/meta
+DESCRIPTION="Example module"
+DEPENDS=(core cli-tools)
+PROFILES=()  # Empty = all profiles
 
-## Adding New Setup Scripts
+# modules/example/install.sh
+#!/usr/bin/env bash
 
-1. Create executable file in `runs/` with numeric prefix: `runs/9-newscript`
-2. Make it executable: `chmod +x runs/9-newscript`
-3. Follow the standard template:
+module_check() {
+    command -v example >/dev/null 2>&1
+}
 
+module_install() {
+    install_packages "example"
+}
+
+module_update() {
+    # Optional
+}
+```
+
+## Adding New Modules
+
+1. Create `modules/newmodule/meta`:
+```bash
+DESCRIPTION="What it does"
+DEPENDS=(core)
+PROFILES=()
+```
+
+2. Create `modules/newmodule/install.sh`:
 ```bash
 #!/usr/bin/env bash
 
-set -euo pipefail
+module_check() {
+    command -v tool >/dev/null 2>&1
+}
 
-source ./utils/os-detect.sh
-os=$(detect_os)
-
-case "$os" in
-arch)
-    paru -S --noconfirm --needed package_name
-    ;;
-ubuntu)
-    sudo apt-get update
-    sudo apt-get install -y package_name
-    ;;
-esac
-
-# Common setup for both distros
-# ...
+module_install() {
+    install_packages "category"
+}
 ```
 
-## Adding New Configs
+3. Add packages to `config/packages.conf` if needed
 
-1. Place config files in appropriate location under `env/`:
-   - `env/.config/appname/` for XDG configs
-   - `env/.local/scripts/` for custom scripts
-   - `env/.dotfile` for home directory dotfiles
-2. Update `dev-env` if adding new dotfile locations
-3. Run `./dev-env` to deploy
+4. Add to profile's `PROFILE_MODULES` or `OPTIONAL_MODULES`
+
+## Adding New Dotfiles
+
+1. Place files in appropriate layer:
+   - `dotfiles/common/` - All profiles
+   - `dotfiles/omarchy/` - Desktop only
+   - `dotfiles/work/` - Work layer (submodule)
+
+2. Run `./dev sync` to deploy
+
+## Git Submodules
+
+This repo uses submodules for:
+- `dotfiles/common/.config/nvim` - Neovim configuration
+- `dotfiles/work/` - Work-specific environment (private)
+
+After cloning, run `git submodule update --init --recursive`
+
+## Machine Configuration
+
+Created by `./dev init`, stored in `.local/machine.conf`:
+
+```bash
+PROFILE="wsl"
+MACHINE_NAME="my-laptop"
+EXTRA_MODULES=(php)
+SKIP_MODULES=()
+INCLUDE_WORK=true
+```

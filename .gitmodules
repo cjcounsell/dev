@@ -1,6 +1,6 @@
-[submodule "env/.config/nvim"]
-	path = env/.config/nvim
+[submodule "dotfiles/common/.config/nvim"]
+	path = dotfiles/common/.config/nvim
 	url = git@github.com:cjcounsell/init.lua
-[submodule "work"]
-	path = work
+[submodule "dotfiles/work"]
+	path = dotfiles/work
 	url = git@github.com:cjcounsell/work

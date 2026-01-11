@@ -1,0 +1,431 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+DEV_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export DEV_ROOT
+
+source "$DEV_ROOT/lib/common.sh"
+source "$DEV_ROOT/lib/os.sh"
+source "$DEV_ROOT/lib/config.sh"
+source "$DEV_ROOT/lib/modules.sh"
+source "$DEV_ROOT/lib/state.sh"
+
+OS=$(detect_os)
+ENV=$(detect_environment)
+export OS ENV
+
+DRY_RUN=0
+FORCE=0
+PROFILE=""
+
+cmd_init() {
+    log_info "Dev Environment Setup"
+    echo ""
+    
+    if [[ -f "$DEV_ROOT/.local/machine.conf" ]]; then
+        log_warn "Machine already configured."
+        confirm "Overwrite?" || { log_info "Cancelled"; exit 0; }
+    fi
+    
+    echo "Detected: OS=$OS, Environment=$ENV"
+    echo ""
+    echo "Select profile:"
+    echo "  1) wsl     - WSL2 development (no GUI)"
+    echo "  2) omarchy - Arch desktop with Hyprland"
+    echo ""
+    read -r -p "Choice [1-2]: " choice
+    
+    case "$choice" in
+        1) PROFILE="wsl" ;;
+        2) PROFILE="omarchy" ;;
+        *) error_exit "Invalid choice" ;;
+    esac
+    
+    local machine_name
+    machine_name=$(prompt_input "Machine name" "$(hostname)")
+    
+    save_machine_config "$PROFILE" "$machine_name"
+    
+    log_success "Configured as: $PROFILE"
+    echo ""
+    echo "Next steps:"
+    echo "  ./dev install    # Install modules"
+    echo "  ./dev sync       # Deploy dotfiles"
+}
+
+cmd_sync() {
+    require_machine_config
+    load_profile "$PROFILE"
+    
+    log_info "Syncing dotfiles for profile: $PROFILE"
+    
+    local layers=("${PROFILE_DOTFILES[@]}")
+    
+    if [[ "${INCLUDE_WORK:-false}" == "true" ]]; then
+        layers+=(work)
+    fi
+    
+    local current_hash
+    current_hash=$(calculate_dotfiles_hash "${layers[@]}")
+    local previous_hash
+    previous_hash=$(sync_get_hash)
+    
+    if [[ "$current_hash" == "$previous_hash" ]] && [[ "$FORCE" != "1" ]]; then
+        log_info "Dotfiles unchanged, skipping"
+        return 0
+    fi
+    
+    init_backup_session "sync-$(date +%Y%m%d-%H%M%S)"
+    
+    for layer in "${layers[@]}"; do
+        local layer_dir="$DEV_ROOT/dotfiles/$layer"
+        if [[ -d "$layer_dir" ]]; then
+            log_info "Applying layer: $layer"
+            sync_layer "$layer_dir"
+        else
+            log_warn "Layer not found: $layer"
+        fi
+    done
+    
+    if declare -f "${PROFILE_NAME}_post_sync" >/dev/null 2>&1; then
+        "${PROFILE_NAME}_post_sync"
+    fi
+    
+    sync_set_hash "$current_hash"
+    cleanup_old_backups 5
+    log_success "Dotfiles synced"
+}
+
+sync_layer() {
+    local src="$1"
+    
+    if [[ -d "$src/.config" ]]; then
+        mkdir -p "$HOME/.config"
+        
+        while IFS= read -r -d '' dir; do
+            local name
+            name=$(basename "$dir")
+            local dest="$HOME/.config/$name"
+            
+            log_debug "  .config/$name"
+            safe_remove "$dest"
+            [[ "$DRY_RUN" == "0" ]] && cp -r "$dir" "$dest"
+        done < <(find "$src/.config" -mindepth 1 -maxdepth 1 -type d -print0)
+        
+        while IFS= read -r -d '' file; do
+            local name
+            name=$(basename "$file")
+            local dest="$HOME/.config/$name"
+            
+            log_debug "  .config/$name"
+            safe_copy "$file" "$dest"
+        done < <(find "$src/.config" -mindepth 1 -maxdepth 1 -type f -print0)
+    fi
+    
+    if [[ -d "$src/.local" ]]; then
+        mkdir -p "$HOME/.local"
+        
+        while IFS= read -r -d '' dir; do
+            local name
+            name=$(basename "$dir")
+            local dest="$HOME/.local/$name"
+            
+            log_debug "  .local/$name"
+            safe_remove "$dest"
+            [[ "$DRY_RUN" == "0" ]] && cp -r "$dir" "$dest"
+        done < <(find "$src/.local" -mindepth 1 -maxdepth 1 -type d -print0)
+    fi
+    
+    while IFS= read -r -d '' file; do
+        local name
+        name=$(basename "$file")
+        local dest="$HOME/$name"
+        
+        log_debug "  $name"
+        safe_copy "$file" "$dest"
+    done < <(find "$src" -mindepth 1 -maxdepth 1 -name ".*" -type f -print0)
+}
+
+calculate_dotfiles_hash() {
+    local layers=("$@")
+    local hash_input=""
+    
+    for layer in "${layers[@]}"; do
+        local layer_dir="$DEV_ROOT/dotfiles/$layer"
+        if [[ -d "$layer_dir" ]]; then
+            hash_input+=$(find "$layer_dir" -type f -print0 2>/dev/null | sort -z | xargs -0 md5sum 2>/dev/null)
+        fi
+    done
+    
+    echo "$hash_input" | md5sum | cut -d' ' -f1
+}
+
+cmd_install() {
+    require_machine_config
+    load_profile "$PROFILE"
+    load_packages
+    
+    local modules_to_install=()
+    
+    if [[ $# -eq 0 ]]; then
+        modules_to_install=("${PROFILE_MODULES[@]}")
+        [[ -v EXTRA_MODULES ]] && [[ ${#EXTRA_MODULES[@]} -gt 0 ]] && modules_to_install+=("${EXTRA_MODULES[@]}")
+        
+        if [[ -v SKIP_MODULES ]] && [[ ${#SKIP_MODULES[@]} -gt 0 ]]; then
+            local filtered=()
+            for m in "${modules_to_install[@]}"; do
+                local skip=0
+                for s in "${SKIP_MODULES[@]}"; do
+                    [[ "$m" == "$s" ]] && skip=1 && break
+                done
+                [[ $skip -eq 0 ]] && filtered+=("$m")
+            done
+            modules_to_install=("${filtered[@]}")
+        fi
+    else
+        modules_to_install=("$@")
+    fi
+    
+    log_info "Modules: ${modules_to_install[*]}"
+    
+    local all_modules=()
+    for module in "${modules_to_install[@]}"; do
+        if ! module_exists "$module"; then
+            error_exit "Unknown module: $module"
+        fi
+        local resolved
+        resolved=$(resolve_dependencies "$module")
+        for m in $resolved; do
+            local found=0
+            for existing in "${all_modules[@]:-}"; do
+                [[ "$existing" == "$m" ]] && found=1 && break
+            done
+            [[ $found -eq 0 ]] && all_modules+=("$m")
+        done
+    done
+    
+    log_debug "Order: ${all_modules[*]}"
+    
+    local installed=0
+    local skipped=0
+    local failed=0
+    
+    for module in "${all_modules[@]}"; do
+        if module_is_installed "$module" && [[ "$FORCE" != "1" ]]; then
+            if run_module "$module" check 2>/dev/null; then
+                log_debug "Skipping: $module"
+                ((skipped++))
+                continue
+            fi
+        fi
+        
+        log_info "Installing: $module"
+        
+        if [[ "$DRY_RUN" == "1" ]]; then
+            log_dry "Would install: $module"
+            ((installed++))
+            continue
+        fi
+        
+        if run_module "$module" install; then
+            module_mark_installed "$module"
+            log_success "$module"
+            ((installed++))
+        else
+            log_error "Failed: $module"
+            ((failed++))
+        fi
+    done
+    
+    echo ""
+    log_info "Done: $installed installed, $skipped skipped, $failed failed"
+    
+    [[ $failed -gt 0 ]] && exit 1
+    return 0
+}
+
+cmd_status() {
+    if ! load_machine_config; then
+        log_warn "Not configured. Run './dev init' first."
+        return 0
+    fi
+    
+    load_profile "$PROFILE"
+    
+    echo "Machine: ${MACHINE_NAME:-unknown}"
+    echo "Profile: $PROFILE"
+    echo "OS: $OS ($ENV)"
+    echo ""
+    
+    echo "Modules:"
+    local all_modules=("${PROFILE_MODULES[@]}")
+    [[ -v EXTRA_MODULES ]] && [[ ${#EXTRA_MODULES[@]} -gt 0 ]] && all_modules+=("${EXTRA_MODULES[@]}")
+    
+    for module in "${all_modules[@]}"; do
+        local status="○"
+        local extra=""
+        
+        if module_is_installed "$module"; then
+            if run_module "$module" check 2>/dev/null; then
+                status="${_GREEN}●${_NC}"
+            else
+                status="${_YELLOW}◐${_NC}"
+                extra=" (needs update)"
+            fi
+        fi
+        
+        load_module_meta "$module"
+        printf "  %b %-15s %s%s\n" "$status" "$module" "${DESCRIPTION:-}" "$extra"
+    done
+    
+    echo ""
+    echo "Legend: ● installed  ◐ needs update  ○ not installed"
+    
+    local last_sync
+    last_sync=$(sync_get_last)
+    if [[ -n "$last_sync" ]]; then
+        echo ""
+        echo "Last sync: $last_sync"
+    fi
+}
+
+cmd_list() {
+    echo "Available modules:"
+    echo ""
+    
+    for module in $(list_modules); do
+        load_module_meta "$module"
+        local profiles_str=""
+        if [[ ${#PROFILES[@]} -gt 0 ]]; then
+            profiles_str=" [${PROFILES[*]}]"
+        fi
+        printf "  %-15s %s%s\n" "$module" "${DESCRIPTION:-}" "$profiles_str"
+    done
+}
+
+cmd_update() {
+    require_machine_config
+    pkg_update
+    log_success "Update complete"
+}
+
+cmd_doctor() {
+    log_info "Diagnostics"
+    echo ""
+    
+    local issues=0
+    
+    printf "OS detection: "
+    if [[ "$OS" == "unknown" ]]; then
+        echo "✗ Unknown"
+        ((issues++))
+    else
+        echo "✓ $OS ($ENV)"
+    fi
+    
+    printf "Machine config: "
+    if [[ -f "$DEV_ROOT/.local/machine.conf" ]]; then
+        echo "✓ Found"
+    else
+        echo "✗ Missing (run ./dev init)"
+        ((issues++))
+    fi
+    
+    printf "Git submodules: "
+    if git -C "$DEV_ROOT" submodule status 2>/dev/null | grep -q "^-"; then
+        echo "✗ Not initialized"
+        ((issues++))
+    else
+        echo "✓ OK"
+    fi
+    
+    for cmd in git zsh curl; do
+        printf "Command '%s': " "$cmd"
+        if command -v "$cmd" >/dev/null 2>&1; then
+            echo "✓"
+        else
+            echo "✗"
+            ((issues++))
+        fi
+    done
+    
+    echo ""
+    if [[ $issues -eq 0 ]]; then
+        log_success "No issues"
+    else
+        log_warn "$issues issue(s) found"
+    fi
+}
+
+require_machine_config() {
+    if ! load_machine_config; then
+        error_exit "Not configured. Run './dev init' first."
+    fi
+}
+
+show_help() {
+    cat <<'EOF'
+Dev Environment Manager
+
+Usage: ./dev [OPTIONS] COMMAND [ARGS...]
+
+Commands:
+  init              First-time setup
+  sync              Deploy dotfiles
+  install [MODULE]  Install module(s)
+  status            Show status
+  list              List modules
+  update            Update packages
+  doctor            Check for issues
+
+Options:
+  -n, --dry-run     Preview changes
+  -f, --force       Force operation
+  -v, --verbose     Debug output
+  -h, --help        Show help
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --dry-run|-n)
+            DRY_RUN=1
+            ;;
+        --force|-f)
+            FORCE=1
+            ;;
+        --verbose|-v)
+            LOG_LEVEL="DEBUG"
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        -*)
+            error_exit "Unknown option: $1"
+            ;;
+        *)
+            break
+            ;;
+    esac
+    shift
+done
+
+export DRY_RUN FORCE LOG_LEVEL
+
+state_init
+
+command="${1:-status}"
+shift || true
+
+case "$command" in
+    init)    cmd_init "$@" ;;
+    sync)    cmd_sync "$@" ;;
+    install) cmd_install "$@" ;;
+    status)  cmd_status "$@" ;;
+    list)    cmd_list "$@" ;;
+    update)  cmd_update "$@" ;;
+    doctor)  cmd_doctor "$@" ;;
+    *)       error_exit "Unknown command: $command" ;;
+esac

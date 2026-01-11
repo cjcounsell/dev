@@ -1,0 +1,3 @@
+DESCRIPTION="Zsh, Oh-My-Zsh, Starship"
+DEPENDS=(core)
+PROFILES=()

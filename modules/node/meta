@@ -1,0 +1,3 @@
+DESCRIPTION="Node.js via mise"
+DEPENDS=(cli-tools)
+PROFILES=()
