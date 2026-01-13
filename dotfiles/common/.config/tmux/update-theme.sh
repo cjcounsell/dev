@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # Omarchy Theme to Tmux Colors
-# Reads colors from Omarchy theme and generates tmux color variables
-# Supports both Kitty and Alacritty theme files
+# Reads colors from Omarchy colors.toml and generates tmux color variables
 
 set -e
 
@@ -12,84 +11,45 @@ if [ "$1" = "-v" ] || [ "$1" = "--verbose" ]; then
     VERBOSE=true
 fi
 
-# Paths - try Kitty first, fall back to Alacritty
-KITTY_THEME_FILE="${HOME}/.config/omarchy/current/theme/kitty.conf"
-ALACRITTY_THEME_FILE="${HOME}/.config/omarchy/current/theme/alacritty.toml"
+# Paths
+COLORS_FILE="${HOME}/.config/omarchy/current/theme/colors.toml"
 TMUX_THEME_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/tmux/theme.conf"
 
-# Determine which theme file to use
-if [ -f "$KITTY_THEME_FILE" ]; then
-    THEME_FILE="$KITTY_THEME_FILE"
-    THEME_TYPE="kitty"
-elif [ -f "$ALACRITTY_THEME_FILE" ]; then
-    THEME_FILE="$ALACRITTY_THEME_FILE"
-    THEME_TYPE="alacritty"
-else
-    echo "Error: No theme file found"
-    echo "  Looked for: $KITTY_THEME_FILE"
-    echo "  Looked for: $ALACRITTY_THEME_FILE"
+if [ ! -f "$COLORS_FILE" ]; then
+    echo "Error: colors.toml not found at $COLORS_FILE"
     exit 1
 fi
 
-echo "Using $THEME_TYPE theme: $THEME_FILE"
+echo "Reading theme from: $COLORS_FILE"
 
 if [ "$VERBOSE" = true ]; then
     echo ""
-    echo "=== Debug: Parsing $THEME_TYPE theme ==="
+    echo "=== Debug: Parsing colors.toml ==="
 fi
 
-if [ "$THEME_TYPE" = "kitty" ]; then
-    # Parse Kitty config format
-    # Kitty format: foreground #RRGGBB or color0 #RRGGBB
-    parse_kitty_color() {
-        local key=$1
-        local line=$(grep "^${key}[[:space:]]" "$THEME_FILE" | grep -v "^#" | head -1)
-        
-        if [ "$VERBOSE" = true ] && [ -n "$line" ]; then
-            echo "  $key: $line"
-        fi
-        
-        if [ -n "$line" ]; then
-            # Extract hex color from line
-            local color=$(echo "$line" | grep -o '#[0-9a-fA-F]\{6\}' | head -1)
-            if [ -z "$color" ]; then
-                # Try without # prefix
-                color=$(echo "$line" | awk '{print $2}' | grep -o '[0-9a-fA-F]\{6\}' | head -1)
-                [ -n "$color" ] && color="#$color"
-            fi
-            echo "$color"
-        else
-            echo ""
-        fi
-    }
-
-    # Extract colors from Kitty theme
-    THEME_FG=$(parse_kitty_color "foreground")
-    THEME_GREEN=$(parse_kitty_color "color2")
-    THEME_BLUE=$(parse_kitty_color "color4")
-    THEME_CYAN=$(parse_kitty_color "color6")
-    THEME_BLACK=$(parse_kitty_color "color0")
+# Parse TOML key = "value" format
+parse_color() {
+    local key=$1
+    local line=$(grep "^${key} *= *" "$COLORS_FILE" | head -1)
     
-else
-    # Parse Alacritty TOML format
-    parse_alacritty_color() {
-        local section=$1
-        local key=$2
-        local color=$(grep -A 20 "^\[colors\.${section}\]" "$THEME_FILE" | grep "^${key} *=" | head -1 | sed -E "s/.*= *['\"]?(#|0x)?([0-9a-fA-F]{6})['\"]?.*/\2/")
-        if [ -n "$color" ]; then
-            echo "#$color"
-        else
-            echo ""
-        fi
-    }
+    if [ "$VERBOSE" = true ] && [ -n "$line" ]; then
+        echo "  $key: $line" >&2
+    fi
+    
+    if [ -n "$line" ]; then
+        echo "$line" | sed -E 's/.*= *"?(#[0-9a-fA-F]{6})"?.*/\1/'
+    else
+        echo ""
+    fi
+}
 
-    # Extract colors from Alacritty theme
-    THEME_FG=$(parse_alacritty_color "primary" "foreground")
-    THEME_GREEN=$(parse_alacritty_color "normal" "green")
-    THEME_BLUE=$(parse_alacritty_color "normal" "blue")
-    THEME_CYAN=$(parse_alacritty_color "normal" "cyan")
-    THEME_BLACK=$(parse_alacritty_color "normal" "black")
-fi
+# Extract colors from colors.toml
+# Mapping: foreground, color0 (black), color2 (green), color4 (blue), color6 (cyan)
+THEME_FG=$(parse_color "foreground")
+THEME_GREEN=$(parse_color "color2")
+THEME_BLUE=$(parse_color "color4")
+THEME_CYAN=$(parse_color "color6")
+THEME_BLACK=$(parse_color "color0")
 
 # Fallbacks if parsing failed
 [ -z "$THEME_FG" ] && THEME_FG="#D8DEE9"
@@ -111,8 +71,8 @@ fi
 
 # Generate tmux theme configuration
 cat > "$TMUX_THEME_CONF" << EOF
-# Auto-generated from Omarchy theme ($THEME_TYPE)
-# Source: $THEME_FILE
+# Auto-generated from Omarchy theme
+# Source: $COLORS_FILE
 # Generated: $(date)
 
 # Color Variables
@@ -125,7 +85,7 @@ set -g @active_window_fg "$THEME_CYAN"
 set -g @active_pane_border "$THEME_FG"
 EOF
 
-echo "✓ Tmux theme colors generated from $THEME_TYPE"
+echo "Tmux theme colors generated"
 echo "  Foreground: $THEME_FG"
 echo "  Session (green): $THEME_GREEN"
 echo "  Active Window (cyan): $THEME_CYAN"
