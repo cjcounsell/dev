@@ -5,7 +5,7 @@
         "opencode-antigravity-auth@1.2.8"
     ],
     "theme": "catppuccin",
-    "model": "anthropic/claude-opus-4-5",
+    "model": "github-copilot/claude-opus-4-5",
     "autoupdate": true,
     "mcp": {
         "github": {
