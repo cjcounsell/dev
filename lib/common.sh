@@ -6,7 +6,7 @@
 # Configuration
 # ============================================================================
 BACKUP_DIR="${BACKUP_DIR:-$HOME/.config-backups}"
-LOG_LEVEL="${LOG_LEVEL:-INFO}"  # DEBUG, INFO, WARN, ERROR
+LOG_LEVEL="${LOG_LEVEL:-INFO}" # DEBUG, INFO, WARN, ERROR
 DRY_RUN="${DRY_RUN:-0}"
 
 # Color codes (disabled if not a terminal)
@@ -74,7 +74,7 @@ _BACKUP_SESSION_DIR=""
 init_backup_session() {
     local session_name="${1:-$(date +%Y%m%d-%H%M%S)}"
     _BACKUP_SESSION_DIR="$BACKUP_DIR/$session_name"
-    
+
     if [[ "${DRY_RUN:-0}" == "0" ]]; then
         mkdir -p "$_BACKUP_SESSION_DIR"
         log_debug "Backup session: $_BACKUP_SESSION_DIR"
@@ -83,15 +83,15 @@ init_backup_session() {
 
 backup_item() {
     local item="$1"
-    
+
     [[ ! -e "$item" ]] && return 0
     [[ -z "$_BACKUP_SESSION_DIR" ]] && init_backup_session
-    
+
     local relative_path="${item#$HOME/}"
     local backup_path="$_BACKUP_SESSION_DIR/$relative_path"
     local backup_parent
     backup_parent="$(dirname "$backup_path")"
-    
+
     if [[ "${DRY_RUN:-0}" == "0" ]]; then
         mkdir -p "$backup_parent"
         if [[ -d "$item" ]]; then
@@ -105,20 +105,20 @@ backup_item() {
 
 cleanup_old_backups() {
     local keep="${1:-5}"
-    
+
     [[ ! -d "$BACKUP_DIR" ]] && return 0
-    
+
     local count
     count=$(find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
-    
+
     [[ $count -le $keep ]] && return 0
-    
+
     local to_remove=$((count - keep))
     log_debug "Cleaning up $to_remove old backup(s)"
-    
+
     if [[ "${DRY_RUN:-0}" == "0" ]]; then
-        find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%T+ %p\n' | \
-            sort | head -n "$to_remove" | cut -d' ' -f2- | \
+        find "$BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%T+ %p\n' |
+            sort | head -n "$to_remove" | cut -d' ' -f2- |
             while read -r dir; do
                 rm -rf "$dir"
             done
@@ -168,11 +168,11 @@ require_writable() {
 # ============================================================================
 safe_remove() {
     local item="$1"
-    
+
     [[ ! -e "$item" ]] && return 0
-    
+
     backup_item "$item"
-    
+
     if [[ "${DRY_RUN:-0}" == "0" ]]; then
         rm -rf "$item"
         log_debug "Removed: $item"
@@ -184,16 +184,16 @@ safe_remove() {
 safe_copy() {
     local src="$1"
     local dest="$2"
-    
+
     [[ ! -e "$src" ]] && error_exit "Source does not exist: $src"
-    
+
     [[ -e "$dest" ]] && backup_item "$dest"
-    
+
     if [[ "${DRY_RUN:-0}" == "0" ]]; then
         local dest_parent
         dest_parent="$(dirname "$dest")"
         mkdir -p "$dest_parent"
-        
+
         if [[ -d "$src" ]]; then
             rm -rf "$dest"
             cp -r "$src" "$dest"
@@ -215,15 +215,15 @@ is_interactive() {
 
 confirm() {
     local prompt="${1:-Continue?}"
-    
+
     if ! is_interactive; then
         return 0
     fi
-    
+
     read -r -p "$prompt [y/N] " response
     case "$response" in
-        [yY][eE][sS]|[yY]) return 0 ;;
-        *) return 1 ;;
+    [yY][eE][sS] | [yY]) return 0 ;;
+    *) return 1 ;;
     esac
 }
 
@@ -231,7 +231,7 @@ prompt_input() {
     local prompt="$1"
     local default="${2:-}"
     local result
-    
+
     if [[ -n "$default" ]]; then
         read -r -p "$prompt [$default]: " result
         echo "${result:-$default}"
@@ -244,16 +244,112 @@ prompt_input() {
 bw_ensure_session() {
     require_command bw "Bitwarden CLI required"
     require_command jq "jq required"
-    
+
     if [[ -n "${BW_SESSION:-}" ]]; then
         return 0
     fi
-    
+
     bw login --check 2>/dev/null || {
         log_info "Logging into Bitwarden"
         bw login
     }
-    
+
     BW_SESSION=$(bw unlock --raw)
     export BW_SESSION
+}
+
+# ============================================================================
+# Diff/Compare Functions
+# ============================================================================
+
+# Compare a source item to a deployed destination
+# Returns via global: COMPARE_RESULT = "identical" | "modified" | "new" | "missing"
+# "new" = exists in source but not in dest
+# "missing" = exists in dest but not in source (only when checking dest->source)
+# "modified" = both exist but differ
+# "identical" = both exist and are the same
+compare_item() {
+    local src="$1"
+    local dest="$2"
+
+    if [[ ! -e "$src" ]]; then
+        if [[ -e "$dest" ]]; then
+            COMPARE_RESULT="missing"
+        else
+            COMPARE_RESULT="missing"
+        fi
+        return 0
+    fi
+
+    if [[ ! -e "$dest" ]]; then
+        COMPARE_RESULT="new"
+        return 0
+    fi
+
+    # Both exist - compare them
+    if [[ -f "$src" && -f "$dest" ]]; then
+        if diff -q "$src" "$dest" >/dev/null 2>&1; then
+            COMPARE_RESULT="identical"
+        else
+            COMPARE_RESULT="modified"
+        fi
+    elif [[ -d "$src" && -d "$dest" ]]; then
+        # For directories, use diff -rq
+        if diff -rq "$src" "$dest" >/dev/null 2>&1; then
+            COMPARE_RESULT="identical"
+        else
+            COMPARE_RESULT="modified"
+        fi
+    else
+        # Type mismatch (one is file, other is dir)
+        COMPARE_RESULT="modified"
+    fi
+    return 0
+}
+
+# Diff two directory trees recursively
+# Outputs lines in format: "STATUS<tab>PATH"
+# STATUS: new, modified, identical
+# Only reports files, not directories themselves
+diff_trees() {
+    local src_dir="$1"
+    local dest_dir="$2"
+    local prefix="${3:-}"
+
+    [[ ! -d "$src_dir" ]] && return 0
+
+    # Process all items in source
+    while IFS= read -r -d '' item; do
+        local name
+        name=$(basename "$item")
+        local rel_path="${prefix}${name}"
+        local dest_item="$dest_dir/$name"
+
+        if [[ -d "$item" ]]; then
+            # Recurse into subdirectory
+            if [[ -d "$dest_item" ]]; then
+                diff_trees "$item" "$dest_item" "${rel_path}/"
+            else
+                # Directory is new - list all files in it as new
+                while IFS= read -r -d '' subfile; do
+                    local sub_rel="${subfile#$item/}"
+                    echo -e "new\t${rel_path}/${sub_rel}"
+                done < <(find "$item" -type f -print0)
+            fi
+        else
+            # It's a file
+            compare_item "$item" "$dest_item"
+            echo -e "${COMPARE_RESULT}\t${rel_path}"
+        fi
+    done < <(find "$src_dir" -mindepth 1 -maxdepth 1 -print0)
+}
+
+# Get list of modified files (dest differs from source)
+# Outputs relative paths of files that have local modifications
+# Args: src_dir dest_dir [prefix]
+get_modified_files() {
+    local src_dir="$1"
+    local dest_dir="$2"
+
+    diff_trees "$src_dir" "$dest_dir" | grep "^modified" | cut -f2
 }

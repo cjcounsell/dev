@@ -15,7 +15,7 @@ state_init() {
 
 state_get() {
     local key="$1"
-    grep "^${key}=" "$STATE_FILE" 2>/dev/null | cut -d'=' -f2-
+    grep "^${key}=" "$STATE_FILE" 2>/dev/null | cut -d'=' -f2- || true
 }
 
 state_set() {

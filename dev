@@ -22,12 +22,15 @@ PROFILE=""
 cmd_init() {
     log_info "Dev Environment Setup"
     echo ""
-    
+
     if [[ -f "$DEV_ROOT/.local/machine.conf" ]]; then
         log_warn "Machine already configured."
-        confirm "Overwrite?" || { log_info "Cancelled"; exit 0; }
+        confirm "Overwrite?" || {
+            log_info "Cancelled"
+            exit 0
+        }
     fi
-    
+
     echo "Detected: OS=$OS, Environment=$ENV"
     echo ""
     echo "Select profile:"
@@ -35,18 +38,18 @@ cmd_init() {
     echo "  2) omarchy - Arch desktop with Hyprland"
     echo ""
     read -r -p "Choice [1-2]: " choice
-    
+
     case "$choice" in
-        1) PROFILE="wsl" ;;
-        2) PROFILE="omarchy" ;;
-        *) error_exit "Invalid choice" ;;
+    1) PROFILE="wsl" ;;
+    2) PROFILE="omarchy" ;;
+    *) error_exit "Invalid choice" ;;
     esac
-    
+
     local machine_name
     machine_name=$(prompt_input "Machine name" "$(hostname)")
-    
+
     save_machine_config "$PROFILE" "$machine_name"
-    
+
     log_success "Configured as: $PROFILE"
     echo ""
     echo "Next steps:"
@@ -57,27 +60,43 @@ cmd_init() {
 cmd_sync() {
     require_machine_config
     load_profile "$PROFILE"
-    
+
     log_info "Syncing dotfiles for profile: $PROFILE"
-    
+
     local layers=("${PROFILE_DOTFILES[@]}")
-    
+
     if [[ "${INCLUDE_WORK:-false}" == "true" ]]; then
         layers+=(work)
     fi
-    
+
     local current_hash
     current_hash=$(calculate_dotfiles_hash "${layers[@]}")
     local previous_hash
     previous_hash=$(sync_get_hash)
-    
+
     if [[ "$current_hash" == "$previous_hash" ]] && [[ "$FORCE" != "1" ]]; then
         log_info "Dotfiles unchanged, skipping"
         return 0
     fi
-    
+
+    if [[ "$DRY_RUN" != "1" ]] && [[ "$FORCE" != "1" ]]; then
+        local modified_files
+        modified_files=$(collect_modified_files "${layers[@]}")
+
+        if [[ -n "$modified_files" ]]; then
+            log_error "Local modifications detected:"
+            echo "$modified_files" | while read -r file; do
+                echo "    $file"
+            done
+            echo ""
+            echo "To preserve changes: ./dev pull <path>"
+            echo "To overwrite anyway: ./dev sync --force"
+            exit 1
+        fi
+    fi
+
     init_backup_session "sync-$(date +%Y%m%d-%H%M%S)"
-    
+
     for layer in "${layers[@]}"; do
         local layer_dir="$DEV_ROOT/dotfiles/$layer"
         if [[ -d "$layer_dir" ]]; then
@@ -87,61 +106,270 @@ cmd_sync() {
             log_warn "Layer not found: $layer"
         fi
     done
-    
+
     if declare -f "${PROFILE_NAME}_post_sync" >/dev/null 2>&1; then
         "${PROFILE_NAME}_post_sync"
     fi
-    
+
     sync_set_hash "$current_hash"
     cleanup_old_backups 5
     log_success "Dotfiles synced"
 }
 
+compare_dotfiles_to_home() {
+    local layers=("$@")
+    local -A seen_files
+    local i
+
+    for ((i = ${#layers[@]} - 1; i >= 0; i--)); do
+        local layer="${layers[$i]}"
+        local layer_dir="$DEV_ROOT/dotfiles/$layer"
+        [[ ! -d "$layer_dir" ]] && continue
+
+        if [[ -d "$layer_dir/.config" ]]; then
+            while IFS= read -r -d '' src_file; do
+                local rel_path="${src_file#$layer_dir/}"
+                [[ -n "${seen_files[$rel_path]:-}" ]] && continue
+                seen_files[$rel_path]=1
+
+                local dest_file="$HOME/$rel_path"
+                if [[ ! -e "$dest_file" ]]; then
+                    echo "new:$rel_path"
+                elif ! diff -q "$src_file" "$dest_file" >/dev/null 2>&1; then
+                    echo "modified:$rel_path"
+                else
+                    echo "identical:$rel_path"
+                fi
+            done < <(find "$layer_dir/.config" -type f -print0)
+        fi
+
+        if [[ -d "$layer_dir/.local" ]]; then
+            while IFS= read -r -d '' src_file; do
+                local rel_path="${src_file#$layer_dir/}"
+                [[ -n "${seen_files[$rel_path]:-}" ]] && continue
+                seen_files[$rel_path]=1
+
+                local dest_file="$HOME/$rel_path"
+                if [[ ! -e "$dest_file" ]]; then
+                    echo "new:$rel_path"
+                elif ! diff -q "$src_file" "$dest_file" >/dev/null 2>&1; then
+                    echo "modified:$rel_path"
+                else
+                    echo "identical:$rel_path"
+                fi
+            done < <(find "$layer_dir/.local" -type f -print0)
+        fi
+
+        while IFS= read -r -d '' file; do
+            local name
+            name=$(basename "$file")
+            [[ -n "${seen_files[$name]:-}" ]] && continue
+            seen_files[$name]=1
+
+            local dest="$HOME/$name"
+            if [[ ! -e "$dest" ]]; then
+                echo "new:$name"
+            elif ! diff -q "$file" "$dest" >/dev/null 2>&1; then
+                echo "modified:$name"
+            else
+                echo "identical:$name"
+            fi
+        done < <(find "$layer_dir" -mindepth 1 -maxdepth 1 -name ".*" -type f -print0)
+    done
+}
+
+collect_modified_files() {
+    local layers=("$@")
+    compare_dotfiles_to_home "${layers[@]}" | grep "^modified:" | cut -d: -f2- | sort -u
+}
+
+cmd_diff() {
+    require_machine_config
+    load_profile "$PROFILE"
+
+    local layers=("${PROFILE_DOTFILES[@]}")
+
+    if [[ "${INCLUDE_WORK:-false}" == "true" ]]; then
+        layers+=(work)
+    fi
+
+    echo "Comparing dotfiles (${layers[*]}) to deployed..."
+    echo ""
+
+    local all_results
+    all_results=$(compare_dotfiles_to_home "${layers[@]}")
+
+    local modified_files new_files identical_count
+    modified_files=$(echo "$all_results" | grep "^modified:" | cut -d: -f2- | sort -u || true)
+    new_files=$(echo "$all_results" | grep "^new:" | cut -d: -f2- | sort -u || true)
+    identical_count=$(echo "$all_results" | grep -c "^identical:" || echo "0")
+
+    if [[ -n "$modified_files" ]]; then
+        echo -e "  ${_YELLOW}Modified:${_NC}"
+        echo "$modified_files" | while read -r f; do
+            [[ -n "$f" ]] && echo "    $f"
+        done
+        echo ""
+    fi
+
+    if [[ -n "$new_files" ]]; then
+        echo -e "  ${_BLUE}New (not deployed):${_NC}"
+        echo "$new_files" | while read -r f; do
+            [[ -n "$f" ]] && echo "    $f"
+        done
+        echo ""
+    fi
+
+    echo -e "  ${_GREEN}Unchanged:${_NC} $identical_count files"
+
+    if [[ -n "$modified_files" ]]; then
+        echo ""
+        echo "Use './dev pull <path>' to save local changes"
+    fi
+}
+
+find_file_layer() {
+    local file_path="$1"
+    local layers=("${PROFILE_DOTFILES[@]}")
+    [[ "${INCLUDE_WORK:-false}" == "true" ]] && layers+=(work)
+
+    local i
+    for ((i = ${#layers[@]} - 1; i >= 0; i--)); do
+        local layer="${layers[$i]}"
+        local full_path="$DEV_ROOT/dotfiles/$layer/$file_path"
+        if [[ -e "$full_path" ]]; then
+            echo "$layer"
+            return 0
+        fi
+    done
+    echo "common"
+}
+
+cmd_pull() {
+    require_machine_config
+    load_profile "$PROFILE"
+
+    local pull_all=0
+    local paths=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+        --all) pull_all=1 ;;
+        *) paths+=("$1") ;;
+        esac
+        shift
+    done
+
+    if [[ $pull_all -eq 1 ]]; then
+        local layers=("${PROFILE_DOTFILES[@]}")
+        [[ "${INCLUDE_WORK:-false}" == "true" ]] && layers+=(work)
+
+        local modified
+        modified=$(collect_modified_files "${layers[@]}")
+
+        if [[ -z "$modified" ]]; then
+            log_info "No local modifications to pull"
+            return 0
+        fi
+
+        mapfile -t paths <<<"$modified"
+    fi
+
+    if [[ ${#paths[@]} -eq 0 ]]; then
+        echo "Usage: ./dev pull <path> [path...]"
+        echo "       ./dev pull --all"
+        echo ""
+        echo "Examples:"
+        echo "  ./dev pull .config/nvim/lua/config/options.lua"
+        echo "  ./dev pull .config/starship.toml .aliases"
+        echo "  ./dev pull --all"
+        exit 1
+    fi
+
+    log_info "Pulling local changes to dotfiles..."
+
+    local pulled=0
+    for path in "${paths[@]}"; do
+        [[ -z "$path" ]] && continue
+
+        path="${path#./}"
+
+        local src="$HOME/$path"
+
+        if [[ ! -e "$src" ]]; then
+            log_warn "Not found: $src"
+            continue
+        fi
+
+        local target_layer
+        target_layer=$(find_file_layer "$path")
+        local dest="$DEV_ROOT/dotfiles/$target_layer/$path"
+
+        local dest_parent
+        dest_parent=$(dirname "$dest")
+        mkdir -p "$dest_parent"
+
+        if [[ -d "$src" ]]; then
+            rm -rf "$dest"
+            cp -r "$src" "$dest"
+        else
+            cp "$src" "$dest"
+        fi
+
+        echo "  $path -> dotfiles/$target_layer/"
+        ((++pulled))
+    done
+
+    if [[ $pulled -gt 0 ]]; then
+        log_success "Pulled $pulled item(s)"
+    fi
+}
+
 sync_layer() {
     local src="$1"
-    
+
     if [[ -d "$src/.config" ]]; then
         mkdir -p "$HOME/.config"
-        
+
         while IFS= read -r -d '' dir; do
             local name
             name=$(basename "$dir")
             local dest="$HOME/.config/$name"
-            
+
             log_debug "  .config/$name"
             safe_remove "$dest"
             [[ "$DRY_RUN" == "0" ]] && cp -r "$dir" "$dest"
         done < <(find "$src/.config" -mindepth 1 -maxdepth 1 -type d -print0)
-        
+
         while IFS= read -r -d '' file; do
             local name
             name=$(basename "$file")
             local dest="$HOME/.config/$name"
-            
+
             log_debug "  .config/$name"
             safe_copy "$file" "$dest"
         done < <(find "$src/.config" -mindepth 1 -maxdepth 1 -type f -print0)
     fi
-    
+
     if [[ -d "$src/.local" ]]; then
         mkdir -p "$HOME/.local"
-        
+
         while IFS= read -r -d '' dir; do
             local name
             name=$(basename "$dir")
             local dest="$HOME/.local/$name"
-            
+
             log_debug "  .local/$name"
             safe_remove "$dest"
             [[ "$DRY_RUN" == "0" ]] && cp -r "$dir" "$dest"
         done < <(find "$src/.local" -mindepth 1 -maxdepth 1 -type d -print0)
     fi
-    
+
     while IFS= read -r -d '' file; do
         local name
         name=$(basename "$file")
         local dest="$HOME/$name"
-        
+
         log_debug "  $name"
         safe_copy "$file" "$dest"
     done < <(find "$src" -mindepth 1 -maxdepth 1 -name ".*" -type f -print0)
@@ -150,14 +378,14 @@ sync_layer() {
 calculate_dotfiles_hash() {
     local layers=("$@")
     local hash_input=""
-    
+
     for layer in "${layers[@]}"; do
         local layer_dir="$DEV_ROOT/dotfiles/$layer"
         if [[ -d "$layer_dir" ]]; then
             hash_input+=$(find "$layer_dir" -type f -print0 2>/dev/null | sort -z | xargs -0 md5sum 2>/dev/null)
         fi
     done
-    
+
     echo "$hash_input" | md5sum | cut -d' ' -f1
 }
 
@@ -165,13 +393,13 @@ cmd_install() {
     require_machine_config
     load_profile "$PROFILE"
     load_packages
-    
+
     local modules_to_install=()
-    
+
     if [[ $# -eq 0 ]]; then
         modules_to_install=("${PROFILE_MODULES[@]}")
         [[ -v EXTRA_MODULES ]] && [[ ${#EXTRA_MODULES[@]} -gt 0 ]] && modules_to_install+=("${EXTRA_MODULES[@]}")
-        
+
         if [[ -v SKIP_MODULES ]] && [[ ${#SKIP_MODULES[@]} -gt 0 ]]; then
             local filtered=()
             for m in "${modules_to_install[@]}"; do
@@ -186,9 +414,9 @@ cmd_install() {
     else
         modules_to_install=("$@")
     fi
-    
+
     log_info "Modules: ${modules_to_install[*]}"
-    
+
     local all_modules=()
     for module in "${modules_to_install[@]}"; do
         if ! module_exists "$module"; then
@@ -204,13 +432,13 @@ cmd_install() {
             [[ $found -eq 0 ]] && all_modules+=("$m")
         done
     done
-    
+
     log_debug "Order: ${all_modules[*]}"
-    
+
     local installed=0
     local skipped=0
     local failed=0
-    
+
     for module in "${all_modules[@]}"; do
         if module_is_installed "$module" && [[ "$FORCE" != "1" ]]; then
             if run_module "$module" check 2>/dev/null; then
@@ -219,15 +447,15 @@ cmd_install() {
                 continue
             fi
         fi
-        
+
         log_info "Installing: $module"
-        
+
         if [[ "$DRY_RUN" == "1" ]]; then
             log_dry "Would install: $module"
             ((installed++))
             continue
         fi
-        
+
         if run_module "$module" install; then
             module_mark_installed "$module"
             log_success "$module"
@@ -237,10 +465,10 @@ cmd_install() {
             ((failed++))
         fi
     done
-    
+
     echo ""
     log_info "Done: $installed installed, $skipped skipped, $failed failed"
-    
+
     [[ $failed -gt 0 ]] && exit 1
     return 0
 }
@@ -250,22 +478,22 @@ cmd_status() {
         log_warn "Not configured. Run './dev init' first."
         return 0
     fi
-    
+
     load_profile "$PROFILE"
-    
+
     echo "Machine: ${MACHINE_NAME:-unknown}"
     echo "Profile: $PROFILE"
     echo "OS: $OS ($ENV)"
     echo ""
-    
+
     echo "Modules:"
     local all_modules=("${PROFILE_MODULES[@]}")
     [[ -v EXTRA_MODULES ]] && [[ ${#EXTRA_MODULES[@]} -gt 0 ]] && all_modules+=("${EXTRA_MODULES[@]}")
-    
+
     for module in "${all_modules[@]}"; do
         local status="○"
         local extra=""
-        
+
         if module_is_installed "$module"; then
             if run_module "$module" check 2>/dev/null; then
                 status="${_GREEN}●${_NC}"
@@ -274,14 +502,14 @@ cmd_status() {
                 extra=" (needs update)"
             fi
         fi
-        
+
         load_module_meta "$module"
         printf "  %b %-15s %s%s\n" "$status" "$module" "${DESCRIPTION:-}" "$extra"
     done
-    
+
     echo ""
     echo "Legend: ● installed  ◐ needs update  ○ not installed"
-    
+
     local last_sync
     last_sync=$(sync_get_last)
     if [[ -n "$last_sync" ]]; then
@@ -293,7 +521,7 @@ cmd_status() {
 cmd_list() {
     echo "Available modules:"
     echo ""
-    
+
     for module in $(list_modules); do
         load_module_meta "$module"
         local profiles_str=""
@@ -313,9 +541,9 @@ cmd_update() {
 cmd_doctor() {
     log_info "Diagnostics"
     echo ""
-    
+
     local issues=0
-    
+
     printf "OS detection: "
     if [[ "$OS" == "unknown" ]]; then
         echo "✗ Unknown"
@@ -323,7 +551,7 @@ cmd_doctor() {
     else
         echo "✓ $OS ($ENV)"
     fi
-    
+
     printf "Machine config: "
     if [[ -f "$DEV_ROOT/.local/machine.conf" ]]; then
         echo "✓ Found"
@@ -331,7 +559,7 @@ cmd_doctor() {
         echo "✗ Missing (run ./dev init)"
         ((issues++))
     fi
-    
+
     printf "Git submodules: "
     if git -C "$DEV_ROOT" submodule status 2>/dev/null | grep -q "^-"; then
         echo "✗ Not initialized"
@@ -339,7 +567,7 @@ cmd_doctor() {
     else
         echo "✓ OK"
     fi
-    
+
     for cmd in git zsh curl; do
         printf "Command '%s': " "$cmd"
         if command -v "$cmd" >/dev/null 2>&1; then
@@ -349,7 +577,7 @@ cmd_doctor() {
             ((issues++))
         fi
     done
-    
+
     echo ""
     if [[ $issues -eq 0 ]]; then
         log_success "No issues"
@@ -373,6 +601,8 @@ Usage: ./dev [OPTIONS] COMMAND [ARGS...]
 Commands:
   init              First-time setup
   sync              Deploy dotfiles
+  diff              Show differences between repo and deployed
+  pull [PATH...]    Pull local changes back to dotfiles/common
   install [MODULE]  Install module(s)
   status            Show status
   list              List modules
@@ -384,30 +614,37 @@ Options:
   -f, --force       Force operation
   -v, --verbose     Debug output
   -h, --help        Show help
+
+Examples:
+  ./dev sync              Sync dotfiles (aborts if local changes exist)
+  ./dev sync --force      Sync dotfiles (overwrite local changes)
+  ./dev diff              Show what differs from deployed
+  ./dev pull .aliases     Pull local .aliases back to repo
+  ./dev pull --all        Pull all local modifications
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --dry-run|-n)
-            DRY_RUN=1
-            ;;
-        --force|-f)
-            FORCE=1
-            ;;
-        --verbose|-v)
-            LOG_LEVEL="DEBUG"
-            ;;
-        --help|-h)
-            show_help
-            exit 0
-            ;;
-        -*)
-            error_exit "Unknown option: $1"
-            ;;
-        *)
-            break
-            ;;
+    --dry-run | -n)
+        DRY_RUN=1
+        ;;
+    --force | -f)
+        FORCE=1
+        ;;
+    --verbose | -v)
+        LOG_LEVEL="DEBUG"
+        ;;
+    --help | -h)
+        show_help
+        exit 0
+        ;;
+    -*)
+        error_exit "Unknown option: $1"
+        ;;
+    *)
+        break
+        ;;
     esac
     shift
 done
@@ -420,12 +657,14 @@ command="${1:-status}"
 shift || true
 
 case "$command" in
-    init)    cmd_init "$@" ;;
-    sync)    cmd_sync "$@" ;;
-    install) cmd_install "$@" ;;
-    status)  cmd_status "$@" ;;
-    list)    cmd_list "$@" ;;
-    update)  cmd_update "$@" ;;
-    doctor)  cmd_doctor "$@" ;;
-    *)       error_exit "Unknown command: $command" ;;
+init) cmd_init "$@" ;;
+sync) cmd_sync "$@" ;;
+diff) cmd_diff "$@" ;;
+pull) cmd_pull "$@" ;;
+install) cmd_install "$@" ;;
+status) cmd_status "$@" ;;
+list) cmd_list "$@" ;;
+update) cmd_update "$@" ;;
+doctor) cmd_doctor "$@" ;;
+*) error_exit "Unknown command: $command" ;;
 esac
