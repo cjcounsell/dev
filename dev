@@ -58,6 +58,15 @@ cmd_init() {
 }
 
 cmd_sync() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+        --force | -f) FORCE=1 ;;
+        --dry-run | -n) DRY_RUN=1 ;;
+        *) log_warn "Unknown option: $1" ;;
+        esac
+        shift
+    done
+
     require_machine_config
     load_profile "$PROFILE"
 
@@ -390,6 +399,18 @@ calculate_dotfiles_hash() {
 }
 
 cmd_install() {
+    local args=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+        --force | -f) FORCE=1 ;;
+        --dry-run | -n) DRY_RUN=1 ;;
+        -*) log_warn "Unknown option: $1" ;;
+        *) args+=("$1") ;;
+        esac
+        shift
+    done
+    set -- "${args[@]}"
+
     require_machine_config
     load_profile "$PROFILE"
     load_packages
