@@ -30,8 +30,11 @@ dev/
 │   │   ├── .config/
 │   │   ├── .local/scripts/
 │   │   └── .*                  # Shell dotfiles
-│   ├── omarchy/                # Desktop-specific
+│   ├── omarchy/                # Desktop-specific (all omarchy machines)
 │   │   └── .config/hypr/
+│   ├── g14/                    # Machine-specific (laptop)
+│   │   └── .config/uwsm/
+│   ├── desktop/                # Machine-specific (desktop)
 │   └── work/                   # Work configs (submodule)
 ├── lib/                        # Shared utilities
 │   ├── common.sh               # Logging, backup, validation
@@ -209,10 +212,13 @@ module_install() {
 
 1. Place files in appropriate layer:
    - `dotfiles/common/` - All profiles
-   - `dotfiles/omarchy/` - Desktop only
+   - `dotfiles/omarchy/` - All omarchy machines (shared desktop config)
+   - `dotfiles/<machine>/` - Machine-specific (e.g., `g14/`, `desktop/`)
    - `dotfiles/work/` - Work layer (submodule)
 
 2. Run `./dev sync` to deploy
+
+Layer order: `common → profile → machine → work` (later layers override earlier)
 
 ## Git Submodules
 

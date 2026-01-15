@@ -74,6 +74,11 @@ cmd_sync() {
 
     local layers=("${PROFILE_DOTFILES[@]}")
 
+    # Add machine-specific layer if it exists
+    if [[ -n "${MACHINE_NAME:-}" ]] && [[ -d "$DEV_ROOT/dotfiles/$MACHINE_NAME" ]]; then
+        layers+=("$MACHINE_NAME")
+    fi
+
     if [[ "${INCLUDE_WORK:-false}" == "true" ]]; then
         layers+=(work)
     fi
@@ -198,6 +203,11 @@ cmd_diff() {
 
     local layers=("${PROFILE_DOTFILES[@]}")
 
+    # Add machine-specific layer if it exists
+    if [[ -n "${MACHINE_NAME:-}" ]] && [[ -d "$DEV_ROOT/dotfiles/$MACHINE_NAME" ]]; then
+        layers+=("$MACHINE_NAME")
+    fi
+
     if [[ "${INCLUDE_WORK:-false}" == "true" ]]; then
         layers+=(work)
     fi
@@ -240,6 +250,8 @@ cmd_diff() {
 find_file_layer() {
     local file_path="$1"
     local layers=("${PROFILE_DOTFILES[@]}")
+    # Add machine-specific layer if it exists
+    [[ -n "${MACHINE_NAME:-}" ]] && [[ -d "$DEV_ROOT/dotfiles/$MACHINE_NAME" ]] && layers+=("$MACHINE_NAME")
     [[ "${INCLUDE_WORK:-false}" == "true" ]] && layers+=(work)
 
     local i
@@ -271,6 +283,8 @@ cmd_pull() {
 
     if [[ $pull_all -eq 1 ]]; then
         local layers=("${PROFILE_DOTFILES[@]}")
+        # Add machine-specific layer if it exists
+        [[ -n "${MACHINE_NAME:-}" ]] && [[ -d "$DEV_ROOT/dotfiles/$MACHINE_NAME" ]] && layers+=("$MACHINE_NAME")
         [[ "${INCLUDE_WORK:-false}" == "true" ]] && layers+=(work)
 
         local modified
