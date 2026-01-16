@@ -40,5 +40,6 @@ PROFILE="wsl"
 MACHINE_NAME="my-laptop"
 EXTRA_MODULES=(php dotnet)  # Add optional modules
 SKIP_MODULES=()             # Skip specific modules
+INCLUDE_WINDOWS=false       # Include Windows desktop configs (yasb, glazewm)
 INCLUDE_WORK=true           # Include work dotfiles layer
 ```

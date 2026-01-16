@@ -79,6 +79,12 @@ cmd_sync() {
         layers+=("$MACHINE_NAME")
     fi
 
+    # Add windows layer if enabled (before work)
+    if [[ "${INCLUDE_WINDOWS:-false}" == "true" ]]; then
+        layers+=(windows)
+    fi
+
+    # Add work layer last (highest precedence)
     if [[ "${INCLUDE_WORK:-false}" == "true" ]]; then
         layers+=(work)
     fi

@@ -30,6 +30,12 @@ dev/
 │   │   ├── .config/
 │   │   ├── .local/scripts/
 │   │   └── .*                  # Shell dotfiles
+│   ├── wsl/                    # WSL profile-specific Linux configs
+│   │   └── .config/
+│   ├── windows/                # Windows desktop configs (optional)
+│   │   └── .config/
+│   │       ├── yasb/           # Windows taskbar
+│   │       └── glazewm/        # Windows tiling WM
 │   ├── omarchy/                # Desktop-specific (all omarchy machines)
 │   │   └── .config/hypr/
 │   ├── g14/                    # Machine-specific (laptop)
@@ -212,13 +218,15 @@ module_install() {
 
 1. Place files in appropriate layer:
    - `dotfiles/common/` - All profiles
+   - `dotfiles/wsl/` - WSL profile only (WSL-specific Linux configs)
+   - `dotfiles/windows/` - Windows desktop configs (optional, enable with INCLUDE_WINDOWS=true)
    - `dotfiles/omarchy/` - All omarchy machines (shared desktop config)
    - `dotfiles/<machine>/` - Machine-specific (e.g., `g14/`, `desktop/`)
    - `dotfiles/work/` - Work layer (submodule)
 
 2. Run `./dev sync` to deploy
 
-Layer order: `common → profile → machine → work` (later layers override earlier)
+Layer order: `common → profile → machine → windows → work` (later layers override earlier)
 
 ## Git Submodules
 
@@ -237,5 +245,6 @@ PROFILE="wsl"
 MACHINE_NAME="my-laptop"
 EXTRA_MODULES=(php)
 SKIP_MODULES=()
+INCLUDE_WINDOWS=true
 INCLUDE_WORK=true
 ```

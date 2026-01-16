@@ -36,6 +36,10 @@ EXTRA_MODULES=()
 # Example: SKIP_MODULES=(desktop)
 SKIP_MODULES=()
 
+# Include Windows desktop configs (yasb, glazewm, etc.)
+# Useful for WSL users who want to manage Windows-side tools
+INCLUDE_WINDOWS=false
+
 # Include work dotfiles layer (requires dotfiles/work submodule)
 INCLUDE_WORK=false
 EOF
