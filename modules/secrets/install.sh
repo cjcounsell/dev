@@ -12,8 +12,8 @@ module_install() {
             install_packages "secrets"
             ;;
         ubuntu)
-            log_info "Installing Bitwarden CLI via snap"
-            sudo snap install bw
+            log_info "Installing Bitwarden CLI via npm"
+            npm install -g @bitwarden/cli
             ;;
     esac
     
