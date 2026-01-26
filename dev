@@ -579,6 +579,73 @@ cmd_list() {
     done
 }
 
+cmd_show() {
+    # Help check first
+    if [[ "${1:-}" == "--help" ]]; then
+        cat <<'EOF'
+Usage: ./dev show <module>
+
+Display detailed information about a module.
+
+Shows:
+  - Description
+  - Installation status
+  - Dependencies
+  - Profile restrictions
+
+Examples:
+  ./dev show core     Show details for core module
+  ./dev show node     Show details for node module
+EOF
+        return 0
+    fi
+    
+    local module="${1:-}"
+    
+    if [[ -z "$module" ]]; then
+        error_exit "Usage: ./dev show <module>"
+    fi
+    
+    if ! module_exists "$module"; then
+        local suggestions
+        suggestions=$(suggest_similar_modules "$module")
+        if [[ -n "$suggestions" ]]; then
+            log_error "Unknown module: $module"
+            echo "Did you mean: $(echo "$suggestions" | tr '\n' ', ' | sed 's/,$//')"
+            exit 1
+        else
+            error_exit "Unknown module: $module. Run './dev list' to see available modules."
+        fi
+    fi
+    
+    load_module_meta "$module"
+    
+    echo "Module: $module"
+    echo ""
+    echo "  Description:  ${DESCRIPTION:-No description}"
+    
+    # Status
+    if module_is_installed "$module"; then
+        echo "  Status:       ✓ Installed"
+    else
+        echo "  Status:       ○ Not installed"
+    fi
+    
+    # Dependencies
+    if [[ ${#DEPENDS[@]} -gt 0 ]]; then
+        echo "  Dependencies: ${DEPENDS[*]}"
+    else
+        echo "  Dependencies: None"
+    fi
+    
+    # Profiles
+    if [[ ${#PROFILES[@]} -gt 0 ]]; then
+        echo "  Profiles:     ${PROFILES[*]}"
+    else
+        echo "  Profiles:     All"
+    fi
+}
+
 # Suggest similar module names
 # Args: $1 = invalid module name
 # Outputs: up to 3 similar module names, one per line
@@ -745,6 +812,7 @@ pull) cmd_pull "$@" ;;
 install) cmd_install "$@" ;;
 status) cmd_status "$@" ;;
 list) cmd_list "$@" ;;
+show) cmd_show "$@" ;;
 update) cmd_update "$@" ;;
 doctor) cmd_doctor "$@" ;;
 *) error_exit "Unknown command: $command" ;;
