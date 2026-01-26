@@ -1,0 +1,64 @@
+#!/bin/bash
+
+# Omarchy Theme Sync for Tmux
+# Updates tmux colors when Omarchy theme changes
+
+TMUX_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/tmux"
+UPDATE_SCRIPT="$TMUX_CONFIG/update-theme.sh"
+TMUX_CONF="$TMUX_CONFIG/tmux.conf"
+
+echo "=== Syncing Tmux with Omarchy Theme ==="
+
+# Check if update script exists
+if [ ! -f "$UPDATE_SCRIPT" ]; then
+    echo "✗ Error: $UPDATE_SCRIPT not found"
+    exit 1
+fi
+
+# Run the theme update script
+echo "→ Generating theme colors..."
+if "$UPDATE_SCRIPT"; then
+    echo "✓ Colors generated successfully"
+else
+    echo "✗ Error generating colors"
+    exit 1
+fi
+
+# Check if tmux config exists
+if [ ! -f "$TMUX_CONF" ]; then
+    echo "✗ Error: $TMUX_CONF not found"
+    exit 1
+fi
+
+# Update tmux if it's running
+if ! command -v tmux &> /dev/null; then
+    echo "⚠ Tmux not installed"
+    exit 0
+fi
+
+if ! tmux list-sessions &> /dev/null 2>&1; then
+    echo "⚠ Tmux not running - colors will apply when you start tmux"
+    exit 0
+fi
+
+echo "→ Reloading tmux for all clients..."
+
+# Get all tmux clients and refresh each one
+# This ensures every window/pane sees the update
+tmux list-clients -F '#{client_name}' | while read -r client; do
+    # Source config for this client specifically
+    tmux -C source-file "$TMUX_CONF" 2>/dev/null || true
+done
+
+# Source globally as well
+tmux source-file "$TMUX_CONF"
+
+# Kill and restart the status bar to force color reload
+# This is the key - tmux caches status bar colors
+tmux set-option -g status off
+tmux set-option -g status on
+
+# Refresh all clients
+tmux refresh-client -S
+
+echo "=== Done ==="
