@@ -61,7 +61,7 @@ cmd_init() {
 cmd_sync() {
     if [[ "${1:-}" == "--help" ]]; then
         cat <<'EOF'
-Usage: ./dev sync [OPTIONS]
+Usage: ./dev sync [OPTIONS] [PATH...]
 
 Deploy dotfiles from repo to home directory.
 
@@ -74,18 +74,22 @@ Layers (in order of precedence):
   common → profile → machine → windows → work
 
 Examples:
-  ./dev sync              Deploy, abort if local changes exist
-  ./dev sync --force      Deploy, overwrite local changes
+  ./dev sync              Deploy all, abort if local changes exist
+  ./dev sync --force      Deploy all, overwrite local changes
   ./dev sync --dry-run    Preview what would be deployed
+  ./dev sync .aliases     Deploy specific file
+  ./dev sync .config/starship.toml .zshrc   Deploy multiple files
 EOF
         return 0
     fi
 
+    local paths=()
     while [[ $# -gt 0 ]]; do
         case "$1" in
         --force | -f) FORCE=1 ;;
         --dry-run | -n) DRY_RUN=1 ;;
-        *) log_warn "Unknown option: $1" ;;
+        -*) log_warn "Unknown option: $1" ;;
+        *) paths+=("$1") ;;
         esac
         shift
     done
@@ -93,6 +97,13 @@ EOF
     require_machine_config
     load_profile "$PROFILE"
 
+    # If specific paths provided, sync only those files
+    if [[ ${#paths[@]} -gt 0 ]]; then
+        sync_specific_files "${paths[@]}"
+        return $?
+    fi
+
+    # Full sync from here
     if [[ "${FORCE:-0}" == "1" ]] && [[ "${SKIP_CONFIRM:-0}" != "1" ]]; then
         if ! confirm "This will overwrite local changes. Continue?"; then
             log_info "Aborted"
@@ -281,6 +292,7 @@ cmd_pull() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
         --all) pull_all=1 ;;
+        --dry-run | -n) DRY_RUN=1 ;;
         *) paths+=("$1") ;;
         esac
         shift
@@ -331,6 +343,12 @@ cmd_pull() {
         target_layer=$(find_file_layer "$path")
         local dest="$DEV_ROOT/dotfiles/$target_layer/$path"
 
+        if [[ "$DRY_RUN" == "1" ]]; then
+            log_dry "$path -> dotfiles/$target_layer/"
+            ((++pulled))
+            continue
+        fi
+
         local dest_parent
         dest_parent=$(dirname "$dest")
         mkdir -p "$dest_parent"
@@ -351,6 +369,63 @@ cmd_pull() {
     fi
 }
 
+sync_specific_files() {
+    local paths=("$@")
+    local synced=0
+
+    log_info "Syncing specific files..."
+
+    for path in "${paths[@]}"; do
+        [[ -z "$path" ]] && continue
+
+        path="${path#./}"
+
+        local layer
+        layer=$(find_file_layer "$path")
+        local src="$DEV_ROOT/dotfiles/$layer/$path"
+
+        if [[ ! -e "$src" ]]; then
+            log_warn "Not found in dotfiles: $path"
+            continue
+        fi
+
+        local dest="$HOME/$path"
+
+        # Check for local modifications unless --force
+        if [[ -e "$dest" ]] && [[ "$FORCE" != "1" ]]; then
+            if ! diff -q "$src" "$dest" >/dev/null 2>&1; then
+                log_error "Local modification exists: $path"
+                echo "  Use --force to overwrite, or './dev pull $path' to save changes"
+                continue
+            fi
+        fi
+
+        if [[ "$DRY_RUN" == "1" ]]; then
+            log_dry "dotfiles/$layer/$path -> $path"
+            ((++synced))
+            continue
+        fi
+
+        local dest_parent
+        dest_parent=$(dirname "$dest")
+        mkdir -p "$dest_parent"
+
+        if [[ -d "$src" ]]; then
+            rm -rf "$dest"
+            cp -r "$src" "$dest"
+        else
+            cp "$src" "$dest"
+        fi
+
+        echo "  dotfiles/$layer/$path -> $path"
+        ((++synced))
+    done
+
+    if [[ $synced -gt 0 ]]; then
+        log_success "Synced $synced item(s)"
+    fi
+}
+
 sync_layer() {
     local src="$1"
 
@@ -364,7 +439,9 @@ sync_layer() {
 
             log_debug "  .config/$name"
             safe_remove "$dest"
-            [[ "$DRY_RUN" == "0" ]] && cp -r "$dir" "$dest"
+            if [[ "$DRY_RUN" == "0" ]]; then
+                cp -r "$dir" "$dest" || log_error "Failed to copy: $dir -> $dest"
+            fi
         done < <(find "$src/.config" -mindepth 1 -maxdepth 1 -type d -print0)
 
         while IFS= read -r -d '' file; do
@@ -387,7 +464,9 @@ sync_layer() {
 
             log_debug "  .local/$name"
             safe_remove "$dest"
-            [[ "$DRY_RUN" == "0" ]] && cp -r "$dir" "$dest"
+            if [[ "$DRY_RUN" == "0" ]]; then
+                cp -r "$dir" "$dest" || log_error "Failed to copy: $dir -> $dest"
+            fi
         done < <(find "$src/.local" -mindepth 1 -maxdepth 1 -type d -print0)
     fi
 
@@ -423,6 +502,7 @@ parse_install_args() {
         case "$1" in
         --force | -f) FORCE=1 ;;
         --dry-run | -n) DRY_RUN=1 ;;
+        --yes | -y) SKIP_CONFIRM=1 ;;
         -*) log_warn "Unknown option: $1" ;;
         *) args+=("$1") ;;
         esac
@@ -707,17 +787,6 @@ suggest_similar_modules() {
         fi
     done
     
-    # If no substring matches, try prefix
-    if [[ $count -eq 0 ]]; then
-        for module in $(list_modules); do
-            if [[ "$module" == "$input"* ]] || [[ "$input" == "$module"* ]]; then
-                suggestions+=("$module")
-                ((count++))
-                [[ $count -ge 3 ]] && break
-            fi
-        done
-    fi
-    
     printf '%s\n' "${suggestions[@]}"
 }
 
@@ -789,7 +858,7 @@ Usage: ./dev [OPTIONS] COMMAND [ARGS...]
 
 Commands:
   init              First-time setup
-  sync              Deploy dotfiles
+  sync [PATH...]    Deploy dotfiles (all or specific files)
   diff              Show differences between repo and deployed
   pull [PATH...]    Pull local changes back to dotfiles/common
   install [MODULE]  Install module(s)
@@ -807,8 +876,9 @@ Options:
   -h, --help        Show help
 
 Examples:
-  ./dev sync              Sync dotfiles (aborts if local changes exist)
-  ./dev sync --force      Sync dotfiles (overwrite local changes)
+  ./dev sync              Sync all dotfiles (aborts if local changes exist)
+  ./dev sync --force      Sync all dotfiles (overwrite local changes)
+  ./dev sync .aliases     Sync specific file from repo to home
   ./dev diff              Show what differs from deployed
   ./dev pull .aliases     Pull local .aliases back to repo
   ./dev pull --all        Pull all local modifications
