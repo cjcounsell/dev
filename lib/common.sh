@@ -387,3 +387,31 @@ build_dotfile_layers() {
 
     printf '%s\n' "${layers[@]}"
 }
+
+# ============================================================================
+# Network Functions
+# ============================================================================
+
+# Curl wrapper with timeouts and error handling
+# Usage: safe_curl [curl-args...] URL
+safe_curl() {
+    local url="${!#}"  # Last argument is URL
+
+    if ! curl --connect-timeout 30 --max-time 300 --fail --silent --show-error "$@"; then
+        local exit_code=$?
+        log_error "Download failed: $url (exit code: $exit_code)"
+        return $exit_code
+    fi
+}
+
+# Wget wrapper with timeouts and error handling
+# Usage: safe_wget [wget-args...] URL
+safe_wget() {
+    local url="${!#}"  # Last argument is URL
+
+    if ! wget --timeout=30 --tries=1 "$@"; then
+        local exit_code=$?
+        log_error "Download failed: $url (exit code: $exit_code)"
+        return $exit_code
+    fi
+}
