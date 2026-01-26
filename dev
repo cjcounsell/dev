@@ -105,9 +105,9 @@ cmd_sync() {
 
         if [[ -n "$modified_files" ]]; then
             log_error "Local modifications detected:"
-            echo "$modified_files" | while read -r file; do
+            while read -r file; do
                 echo "    $file"
-            done
+            done <<< "$modified_files"
             echo ""
             echo "To preserve changes: ./dev pull <path>"
             echo "To overwrite anyway: ./dev sync --force"
@@ -411,7 +411,9 @@ calculate_dotfiles_hash() {
     for layer in "${layers[@]}"; do
         local layer_dir="$DEV_ROOT/dotfiles/$layer"
         if [[ -d "$layer_dir" ]]; then
-            hash_input+=$(find "$layer_dir" -type f -print0 2>/dev/null | sort -z | xargs -0 md5sum 2>/dev/null)
+            local layer_hashes
+            layer_hashes=$(find "$layer_dir" -type f -print0 | sort -z | xargs -0 md5sum) || true
+            hash_input+="$layer_hashes"
         fi
     done
 
