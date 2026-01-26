@@ -435,7 +435,15 @@ resolve_install_modules() {
     all_modules=()
     for module in "${modules_to_install[@]}"; do
         if ! module_exists "$module"; then
-            error_exit "Unknown module: $module"
+            local suggestions
+            suggestions=$(suggest_similar_modules "$module")
+            if [[ -n "$suggestions" ]]; then
+                log_error "Unknown module: $module"
+                echo "Did you mean: $(echo "$suggestions" | tr '\n' ', ' | sed 's/,$//')"
+                exit 1
+            else
+                error_exit "Unknown module: $module. Run './dev list' to see available modules."
+            fi
         fi
         local resolved
         resolved=$(resolve_dependencies "$module")
