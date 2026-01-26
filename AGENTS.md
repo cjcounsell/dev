@@ -2,7 +2,7 @@
 
 Personal dev environment manager for Linux (Arch/Ubuntu). Manages dotfiles, shell configs, and software installation using modular bash scripts with profile-based configuration.
 
-## Quick Reference
+## Commands
 
 ```bash
 ./dev                   # Show status
@@ -13,42 +13,39 @@ Personal dev environment manager for Linux (Arch/Ubuntu). Manages dotfiles, shel
 ./dev doctor            # Check for issues
 ./dev diff              # Show differences between repo and deployed
 ./dev pull <path>       # Pull local changes back to dotfiles
+./dev list              # List available modules
 ```
 
-## Repository Structure
+## Linting
+
+```bash
+shellcheck dev lib/*.sh modules/*/install.sh  # Lint all scripts
+```
+
+No automated tests. Manual verification: `./dev --dry-run sync` and `./dev doctor`.
+
+## Structure
 
 ```
 dev/
-├── dev                         # Main CLI entry point
+├── dev                         # Main CLI (~936 lines)
 ├── config/
 │   ├── packages.conf           # Package definitions by OS
 │   └── profiles/{wsl,omarchy}.conf
 ├── modules/{name}/             # Install modules
 │   ├── meta                    # DESCRIPTION, DEPENDS, PROFILES
 │   └── install.sh              # module_check(), module_install()
-├── dotfiles/
-│   ├── common/                 # All profiles
-│   ├── wsl/                    # WSL-specific
-│   ├── omarchy/                # Arch desktop
-│   ├── {machine}/              # Machine-specific (g14, desktop)
-│   └── work/                   # Work layer (submodule)
-├── lib/                        # Shared utilities
-│   ├── common.sh               # Logging, backup, validation
-│   ├── os.sh                   # OS detection, package manager
-│   ├── config.sh               # Profile/config loading
-│   ├── modules.sh              # Module discovery, deps
-│   └── state.sh                # Installation tracking
+├── dotfiles/{common,wsl,omarchy,{machine},work}/
+├── lib/{common,os,config,modules,state}.sh
 └── .local/machine.conf         # Local config (gitignored)
 ```
 
 ## Code Style
 
-### Shell Scripts
-
+Every script starts with:
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
-
 source "$DEV_ROOT/lib/common.sh"
 source "$DEV_ROOT/lib/os.sh"
 ```
@@ -57,119 +54,92 @@ source "$DEV_ROOT/lib/os.sh"
 
 **Functions**: `snake_case`, namespaced (`log_*`, `pkg_*`, `module_*`, `state_*`)
 
-### Key Library Functions
+### Key Functions
 
 ```bash
-# Logging (lib/common.sh)
-log_info "message"              # Blue
-log_warn "message"              # Yellow, stderr
-log_error "message"             # Red, stderr
-log_success "message"           # Green
+# Logging
+log_info "message"    log_warn "message"    log_error "message"    log_success "message"
 
-# Validation - exits on failure
-require_command git "Git required"
-require_dir "/path"
-require_file "/path/file"
+# Validation (exit on failure)
+require_command git "msg"    require_dir "/path"    require_file "/path"
 
-# Safe operations - auto backup
-safe_copy "$src" "$dest"
-safe_remove "$path"
+# Safe ops (auto backup)
+safe_copy "$src" "$dest"    safe_remove "$path"
 
-# Package management (lib/os.sh)
-OS=$(detect_os)                 # arch|ubuntu|unknown
-ENV=$(detect_environment)       # wsl|native
-pkg_install pkg1 pkg2           # OS-agnostic install
-install_packages "category"     # From packages.conf
+# Package mgmt
+OS=$(detect_os)             # arch|ubuntu|unknown
+install_packages "category" # From packages.conf: category_common + category_$OS
 ```
 
-### Conditionals & Error Handling
+### Patterns
 
 ```bash
+# Short-circuit
 [[ -z "$VAR" ]] && echo "empty"
-[[ -d "$dir" ]] || mkdir -p "$dir"
 command -v nvim >/dev/null 2>&1 && echo "found"
 
-[[ -d "$src" ]] || {
-    log_error "Source missing"
-    exit 1
-}
+# Error block
+[[ -d "$src" ]] || { log_error "Missing"; exit 1; }
+
+# OS-specific
+case "$OS" in
+    arch) install_packages "neovim" ;;
+    ubuntu) curl -LO https://... ;;
+esac
 ```
 
-## Module Structure
+## Modules
 
-### meta
+### meta file
 ```bash
 DESCRIPTION="Human readable description"
-DEPENDS=(core cli-tools)
-PROFILES=()  # Empty = all profiles
+DEPENDS=(core cli-tools)  # Installed first
+PROFILES=()               # Empty = all profiles
 ```
 
 ### install.sh
 ```bash
 #!/usr/bin/env bash
 
-module_check() {
-    command -v tool >/dev/null 2>&1
-}
+module_check() { command -v tool >/dev/null 2>&1; }
 
 module_install() {
     install_packages "category"
 }
 ```
 
-### Common Patterns
-
-```bash
-# Version check
-module_check() {
-    command -v node >/dev/null 2>&1 && \
-    node -v 2>/dev/null | grep -q "^v2[4-9]"
-}
-
-# OS-specific install
-module_install() {
-    case "$OS" in
-        arch) install_packages "neovim" ;;
-        ubuntu)
-            curl -LO https://example.com/tool.tar.gz
-            sudo tar -C /opt -xzf tool.tar.gz
-            ;;
-    esac
-}
-```
-
 ## Dotfile Layers
 
-Order (later overrides earlier): `common → profile → machine → windows → work`
+Precedence (later overrides): `common → profile → machine → windows → work`
 
-| Layer | Purpose |
-|-------|---------|
-| `common/` | All profiles |
-| `wsl/`, `omarchy/` | Profile-specific |
-| `{machine}/` | Machine-specific (g14, desktop) |
-| `windows/` | Windows configs (INCLUDE_WINDOWS=true) |
-| `work/` | Work submodule (INCLUDE_WORK=true) |
+- `common/` - All profiles
+- `wsl/`, `omarchy/` - Profile-specific
+- `{machine}/` - Machine-specific (g14, desktop)
+- `windows/` - Win configs (INCLUDE_WINDOWS=true)
+- `work/` - Work submodule (INCLUDE_WORK=true)
 
-## Lua (Neovim)
+## packages.conf
 
-- **Formatting**: 2 spaces indent, 120 column width (StyLua)
-- **Style**: `vim.opt.*`, `vim.g.*`, `vim.schedule(function() end)`
-
-## Zsh
-
-```zsh
-[[ -f "$path" ]] && source "$path"
-command -v starship >/dev/null 2>&1 && eval "$(starship init zsh)"
+```bash
+core_common=(git)
+core_arch=(base-devel)
+core_ubuntu=(build-essential)
 ```
+
+## Anti-Patterns
+
+- **Don't** use `cd` in scripts (use absolute paths or subshells)
+- **Don't** use unquoted variables: `"$var"` not `$var`
+- **Don't** use `[ ]` for tests: use `[[ ]]`
+- **Don't** use backticks: use `$(command)`
+- **Don't** modify `$HOME` directly in modules; use dotfiles layers
+- **Don't** hardcode package names; use packages.conf
 
 ## Git Submodules
 
 ```bash
 git submodule update --init --recursive
 ```
-
-- `dotfiles/common/.config/nvim` - Neovim config
-- `dotfiles/work/` - Work environment (private)
 
 ## Machine Config (.local/machine.conf)
 
