@@ -353,3 +353,37 @@ get_modified_files() {
 
     diff_trees "$src_dir" "$dest_dir" | grep "^modified" | cut -f2
 }
+
+# ============================================================================
+# Dotfile Layer Assembly
+# ============================================================================
+
+# Build the complete dotfile layers array
+# Outputs layer names to stdout, one per line
+# Caller can capture with: mapfile -t layers < <(build_dotfile_layers)
+#
+# Layer precedence (lowest to highest):
+# 1. Profile dotfiles (from PROFILE_DOTFILES array)
+# 2. Machine-specific (if MACHINE_NAME set and dir exists)
+# 3. Windows layer (if INCLUDE_WINDOWS=true)
+# 4. Work layer (if INCLUDE_WORK=true) - highest precedence
+build_dotfile_layers() {
+    local layers=("${PROFILE_DOTFILES[@]}")
+
+    # Add machine-specific layer if it exists
+    if [[ -n "${MACHINE_NAME:-}" ]] && [[ -d "$DEV_ROOT/dotfiles/$MACHINE_NAME" ]]; then
+        layers+=("$MACHINE_NAME")
+    fi
+
+    # Add windows layer if enabled (before work)
+    if [[ "${INCLUDE_WINDOWS:-false}" == "true" ]]; then
+        layers+=(windows)
+    fi
+
+    # Add work layer last (highest precedence)
+    if [[ "${INCLUDE_WORK:-false}" == "true" ]]; then
+        layers+=(work)
+    fi
+
+    printf '%s\n' "${layers[@]}"
+}
