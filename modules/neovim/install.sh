@@ -3,7 +3,8 @@
 set -euo pipefail
 
 module_check() {
-    command -v nvim >/dev/null 2>&1
+    command -v nvim >/dev/null 2>&1 || \
+    [[ -x "/opt/nvim-linux-x86_64/bin/nvim" ]]
 }
 
 module_install() {
