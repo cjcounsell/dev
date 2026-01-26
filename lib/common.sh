@@ -87,7 +87,7 @@ backup_item() {
     [[ ! -e "$item" ]] && return 0
     [[ -z "$_BACKUP_SESSION_DIR" ]] && init_backup_session
 
-    local relative_path="${item#$HOME/}"
+    local relative_path="${item#"$HOME"/}"
     local backup_path="$_BACKUP_SESSION_DIR/$relative_path"
     local backup_parent
     backup_parent="$(dirname "$backup_path")"
@@ -254,7 +254,7 @@ bw_ensure_session() {
         bw login
     }
 
-    BW_SESSION=$(bw unlock --raw)
+    BW_SESSION=$(bw unlock --raw) || error_exit "Failed to unlock Bitwarden vault"
     export BW_SESSION
 }
 

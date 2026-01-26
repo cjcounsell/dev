@@ -40,7 +40,7 @@ pkg_install() {
             paru -S --noconfirm --needed "${packages[@]}"
             ;;
         ubuntu)
-            sudo apt-get update -qq
+            sudo apt-get update || error_exit "apt-get update failed. Check network connection."
             sudo apt-get install -y "${packages[@]}"
             ;;
         *)
