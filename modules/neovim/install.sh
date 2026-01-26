@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 module_check() {
     command -v nvim >/dev/null 2>&1
 }

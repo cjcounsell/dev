@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 module_check() {
     [[ -f "$HOME/.ssh/id_ed25519" ]]
 }

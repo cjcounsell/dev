@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 module_check() {
     command -v fzf >/dev/null 2>&1 && \
     command -v rg >/dev/null 2>&1 && \

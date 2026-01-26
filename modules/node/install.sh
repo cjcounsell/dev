@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 module_check() {
     command -v node >/dev/null 2>&1 && \
     node -v 2>/dev/null | grep -q "^v2[4-9]"

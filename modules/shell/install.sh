@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 module_check() {
     command -v zsh >/dev/null 2>&1 && \
     [[ -d "$HOME/.oh-my-zsh" ]] && \
