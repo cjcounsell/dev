@@ -16,6 +16,8 @@ for config in "${configs[@]}"; do
   [[ -f "$config" ]] && source "$config"
 done
 
+command -v proxyoff >/dev/null 2>&1 && proxyoff
+
 # Load Bun completions
 [[ -s "$HOME/.bun/_bun" ]] && source "$HOME/.bun/_bun"
 
