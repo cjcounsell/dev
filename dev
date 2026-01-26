@@ -121,6 +121,20 @@ cmd_sync() {
     log_success "Dotfiles synced"
 }
 
+compare_file_to_home() {
+    local src_file="$1"
+    local rel_path="$2"
+    local dest_file="$3"
+    
+    if [[ ! -e "$dest_file" ]]; then
+        echo "new:$rel_path"
+    elif ! diff -q "$src_file" "$dest_file" >/dev/null 2>&1; then
+        echo "modified:$rel_path"
+    else
+        echo "identical:$rel_path"
+    fi
+}
+
 compare_dotfiles_to_home() {
     local layers=("$@")
     local -A seen_files
@@ -138,13 +152,7 @@ compare_dotfiles_to_home() {
                 seen_files[$rel_path]=1
 
                 local dest_file="$HOME/$rel_path"
-                if [[ ! -e "$dest_file" ]]; then
-                    echo "new:$rel_path"
-                elif ! diff -q "$src_file" "$dest_file" >/dev/null 2>&1; then
-                    echo "modified:$rel_path"
-                else
-                    echo "identical:$rel_path"
-                fi
+                compare_file_to_home "$src_file" "$rel_path" "$dest_file"
             done < <(find "$layer_dir/.config" -type f -print0)
         fi
 
@@ -155,13 +163,7 @@ compare_dotfiles_to_home() {
                 seen_files[$rel_path]=1
 
                 local dest_file="$HOME/$rel_path"
-                if [[ ! -e "$dest_file" ]]; then
-                    echo "new:$rel_path"
-                elif ! diff -q "$src_file" "$dest_file" >/dev/null 2>&1; then
-                    echo "modified:$rel_path"
-                else
-                    echo "identical:$rel_path"
-                fi
+                compare_file_to_home "$src_file" "$rel_path" "$dest_file"
             done < <(find "$layer_dir/.local" -type f -print0)
         fi
 
@@ -172,13 +174,7 @@ compare_dotfiles_to_home() {
             seen_files[$name]=1
 
             local dest="$HOME/$name"
-            if [[ ! -e "$dest" ]]; then
-                echo "new:$name"
-            elif ! diff -q "$file" "$dest" >/dev/null 2>&1; then
-                echo "modified:$name"
-            else
-                echo "identical:$name"
-            fi
+            compare_file_to_home "$file" "$name" "$dest"
         done < <(find "$layer_dir" -mindepth 1 -maxdepth 1 -name ".*" -type f -print0)
     done
 }
