@@ -2,6 +2,39 @@
 # Configuration loading and parsing
 
 # ============================================================================
+# Safe Source Helper
+# ============================================================================
+
+# Safely source a config file with path validation
+# Usage: safe_source "$file" "description"
+safe_source() {
+    local file="$1"
+    local desc="${2:-config}"
+    
+    # Must exist and be readable
+    if [[ ! -f "$file" ]]; then
+        error_exit "$desc not found: $file"
+    fi
+    if [[ ! -r "$file" ]]; then
+        error_exit "$desc not readable: $file"
+    fi
+    
+    # No path traversal
+    if [[ "$file" == *".."* ]]; then
+        error_exit "$desc contains invalid path: $file"
+    fi
+    
+    # Must be within allowed locations
+    local real_path
+    real_path="$(realpath "$file" 2>/dev/null)" || real_path="$file"
+    if [[ "$real_path" != "$DEV_ROOT"/* && "$real_path" != "$HOME"/* ]]; then
+        error_exit "$desc outside allowed locations: $file"
+    fi
+    
+    source "$file"
+}
+
+# ============================================================================
 # Machine Configuration
 # ============================================================================
 
@@ -9,7 +42,7 @@ load_machine_config() {
     local machine_conf="$DEV_ROOT/.local/machine.conf"
     
     if [[ -f "$machine_conf" ]]; then
-        source "$machine_conf"
+        safe_source "$machine_conf" "Machine config"
         return 0
     fi
     return 1
@@ -57,7 +90,7 @@ load_profile() {
         error_exit "Profile not found: $profile"
     fi
     
-    source "$profile_conf"
+    safe_source "$profile_conf" "Profile config"
 }
 
 # ============================================================================
@@ -71,5 +104,5 @@ load_packages() {
         error_exit "Packages config not found: $packages_conf"
     fi
     
-    source "$packages_conf"
+    safe_source "$packages_conf" "Packages config"
 }
