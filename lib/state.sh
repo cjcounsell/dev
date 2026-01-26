@@ -4,6 +4,8 @@
 
 STATE_FILE="$DEV_ROOT/.local/state"
 
+trap 'rm -f "$STATE_FILE".$$' EXIT
+
 # ============================================================================
 # State File Management
 # ============================================================================
@@ -21,20 +23,33 @@ state_get() {
 state_set() {
     local key="$1"
     local value="$2"
+    local tmp_file="$STATE_FILE.$$"
     
-    # Create temp file without the key
-    grep -v "^${key}=" "$STATE_FILE" > "$STATE_FILE.tmp" 2>/dev/null || true
+    # Create temp file without the key, add new entry
+    {
+        grep -v "^${key}=" "$STATE_FILE" 2>/dev/null || true
+        echo "${key}=${value}"
+    } > "$tmp_file"
     
-    # Add new entry
-    echo "${key}=${value}" >> "$STATE_FILE.tmp"
-    
-    mv "$STATE_FILE.tmp" "$STATE_FILE"
+    # Sync to disk and atomically replace
+    sync "$tmp_file" 2>/dev/null || true
+    mv "$tmp_file" "$STATE_FILE" || {
+        rm -f "$tmp_file"
+        return 1
+    }
 }
 
 state_remove() {
     local key="$1"
-    grep -v "^${key}=" "$STATE_FILE" > "$STATE_FILE.tmp" 2>/dev/null || true
-    mv "$STATE_FILE.tmp" "$STATE_FILE"
+    local tmp_file="$STATE_FILE.$$"
+    
+    grep -v "^${key}=" "$STATE_FILE" > "$tmp_file" 2>/dev/null || true
+    
+    sync "$tmp_file" 2>/dev/null || true
+    mv "$tmp_file" "$STATE_FILE" || {
+        rm -f "$tmp_file"
+        return 1
+    }
 }
 
 # ============================================================================
