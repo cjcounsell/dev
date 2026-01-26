@@ -387,8 +387,8 @@ calculate_dotfiles_hash() {
     echo "$hash_input" | md5sum | cut -d' ' -f1
 }
 
-cmd_install() {
-    local args=()
+parse_install_args() {
+    args=()
     while [[ $# -gt 0 ]]; do
         case "$1" in
         --force | -f) FORCE=1 ;;
@@ -398,12 +398,9 @@ cmd_install() {
         esac
         shift
     done
-    set -- "${args[@]}"
+}
 
-    require_machine_config
-    load_profile "$PROFILE"
-    load_packages
-
+resolve_install_modules() {
     local modules_to_install=()
 
     if [[ $# -eq 0 ]]; then
@@ -427,7 +424,7 @@ cmd_install() {
 
     log_info "Modules: ${modules_to_install[*]}"
 
-    local all_modules=()
+    all_modules=()
     for module in "${modules_to_install[@]}"; do
         if ! module_exists "$module"; then
             error_exit "Unknown module: $module"
@@ -444,7 +441,9 @@ cmd_install() {
     done
 
     log_debug "Order: ${all_modules[*]}"
+}
 
+execute_module_installs() {
     local installed=0
     local skipped=0
     local failed=0
@@ -453,7 +452,7 @@ cmd_install() {
         if module_is_installed "$module" && [[ "$FORCE" != "1" ]]; then
             if run_module "$module" check 2>/dev/null; then
                 log_debug "Skipping: $module"
-                ((skipped++))
+                ((skipped++)) || true
                 continue
             fi
         fi
@@ -462,25 +461,38 @@ cmd_install() {
 
         if [[ "$DRY_RUN" == "1" ]]; then
             log_dry "Would install: $module"
-            ((installed++))
+            ((installed++)) || true
             continue
         fi
 
         if run_module "$module" install; then
             module_mark_installed "$module"
             log_success "$module"
-            ((installed++))
+            ((installed++)) || true
         else
             log_error "Failed: $module"
-            ((failed++))
+            ((failed++)) || true
         fi
     done
 
     echo ""
     log_info "Done: $installed installed, $skipped skipped, $failed failed"
 
-    [[ $failed -gt 0 ]] && exit 1
+    [[ $failed -gt 0 ]] && return 1
     return 0
+}
+
+cmd_install() {
+    parse_install_args "$@"
+    set -- "${args[@]}"
+
+    require_machine_config
+    load_profile "$PROFILE"
+    load_packages
+
+    resolve_install_modules "$@"
+
+    execute_module_installs
 }
 
 cmd_status() {
