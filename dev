@@ -17,6 +17,7 @@ export OS ENV
 
 DRY_RUN=0
 FORCE=0
+SKIP_CONFIRM=0
 PROFILE=""
 
 cmd_init() {
@@ -69,6 +70,13 @@ cmd_sync() {
 
     require_machine_config
     load_profile "$PROFILE"
+
+    if [[ "${FORCE:-0}" == "1" ]] && [[ "${SKIP_CONFIRM:-0}" != "1" ]]; then
+        if ! confirm "This will overwrite local changes. Continue?"; then
+            log_info "Aborted"
+            return 0
+        fi
+    fi
 
     log_info "Syncing dotfiles for profile: $PROFILE"
 
@@ -492,6 +500,15 @@ cmd_install() {
 
     resolve_install_modules "$@"
 
+    # If no specific modules requested (installing all profile modules)
+    if [[ $# -eq 0 ]] && [[ "${SKIP_CONFIRM:-0}" != "1" ]]; then
+        local count=${#all_modules[@]}
+        if ! confirm "Install all profile modules? ($count modules)"; then
+            log_info "Aborted"
+            return 0
+        fi
+    fi
+
     execute_module_installs
 }
 
@@ -552,6 +569,37 @@ cmd_list() {
         fi
         printf "  %-15s %s%s\n" "$module" "${DESCRIPTION:-}" "$profiles_str"
     done
+}
+
+# Suggest similar module names
+# Args: $1 = invalid module name
+# Outputs: up to 3 similar module names, one per line
+suggest_similar_modules() {
+    local input="$1"
+    local suggestions=()
+    local count=0
+    
+    for module in $(list_modules); do
+        # Substring match (input contained in module or vice versa)
+        if [[ "$module" == *"$input"* ]] || [[ "$input" == *"$module"* ]]; then
+            suggestions+=("$module")
+            ((count++))
+            [[ $count -ge 3 ]] && break
+        fi
+    done
+    
+    # If no substring matches, try prefix
+    if [[ $count -eq 0 ]]; then
+        for module in $(list_modules); do
+            if [[ "$module" == "$input"* ]] || [[ "$input" == "$module"* ]]; then
+                suggestions+=("$module")
+                ((count++))
+                [[ $count -ge 3 ]] && break
+            fi
+        done
+    fi
+    
+    printf '%s\n' "${suggestions[@]}"
 }
 
 cmd_update() {
@@ -654,6 +702,9 @@ while [[ $# -gt 0 ]]; do
     --force | -f)
         FORCE=1
         ;;
+    --yes | -y)
+        SKIP_CONFIRM=1
+        ;;
     --verbose | -v)
         LOG_LEVEL="DEBUG"
         ;;
@@ -671,7 +722,7 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-export DRY_RUN FORCE LOG_LEVEL
+export DRY_RUN FORCE LOG_LEVEL SKIP_CONFIRM
 
 state_init
 
