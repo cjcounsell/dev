@@ -85,15 +85,19 @@ install_packages() {
     
     local packages=()
     
-    # Add common packages if defined
-    if declare -p "$common_var" &>/dev/null; then
-        eval "packages+=(\"\${${common_var}[@]}\")"
-    fi
-    
-    # Add OS-specific packages if defined
-    if declare -p "$os_var" &>/dev/null; then
-        eval "packages+=(\"\${${os_var}[@]}\")"
-    fi
+     # Add common packages if defined
+     if declare -p "$common_var" &>/dev/null; then
+         declare -n _ref="$common_var"
+         packages+=("${_ref[@]}")
+         unset -n _ref
+     fi
+     
+     # Add OS-specific packages if defined
+     if declare -p "$os_var" &>/dev/null; then
+         declare -n _ref="$os_var"
+         packages+=("${_ref[@]}")
+         unset -n _ref
+     fi
     
     if [[ ${#packages[@]} -eq 0 ]]; then
         log_debug "No packages found for category: $category"
