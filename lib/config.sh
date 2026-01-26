@@ -74,6 +74,7 @@ SKIP_MODULES=()
 INCLUDE_WINDOWS=false
 
 # Include work dotfiles layer (requires dotfiles/work submodule)
+# Set to true if you have access to the private work submodule
 INCLUDE_WORK=false
 EOF
 }
