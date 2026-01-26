@@ -59,6 +59,28 @@ cmd_init() {
 }
 
 cmd_sync() {
+    if [[ "${1:-}" == "--help" ]]; then
+        cat <<'EOF'
+Usage: ./dev sync [OPTIONS]
+
+Deploy dotfiles from repo to home directory.
+
+Options:
+  -n, --dry-run    Preview changes without applying
+  -f, --force      Overwrite local changes (prompts for confirmation)
+  -y, --yes        Skip confirmation prompts
+
+Layers (in order of precedence):
+  common → profile → machine → windows → work
+
+Examples:
+  ./dev sync              Deploy, abort if local changes exist
+  ./dev sync --force      Deploy, overwrite local changes
+  ./dev sync --dry-run    Preview what would be deployed
+EOF
+        return 0
+    fi
+
     while [[ $# -gt 0 ]]; do
         case "$1" in
         --force | -f) FORCE=1 ;;
@@ -499,6 +521,28 @@ execute_module_installs() {
 }
 
 cmd_install() {
+    if [[ "${1:-}" == "--help" ]]; then
+        cat <<'EOF'
+Usage: ./dev install [OPTIONS] [MODULE...]
+
+Install development environment modules.
+
+Options:
+  -n, --dry-run    Preview what would be installed
+  -y, --yes        Skip confirmation prompts
+
+If no modules specified, installs all modules for current profile.
+Dependencies are automatically resolved and installed first.
+
+Examples:
+  ./dev install             Install all profile modules
+  ./dev install core        Install core module and dependencies
+  ./dev install node rust   Install specific modules
+  ./dev install --dry-run   Preview installation
+EOF
+        return 0
+    fi
+
     parse_install_args "$@"
     set -- "${args[@]}"
 
@@ -751,12 +795,14 @@ Commands:
   install [MODULE]  Install module(s)
   status            Show status
   list              List modules
+  show <module>     Show module details
   update            Update packages
   doctor            Check for issues
 
 Options:
   -n, --dry-run     Preview changes
   -f, --force       Force operation
+  -y, --yes         Skip confirmation prompts
   -v, --verbose     Debug output
   -h, --help        Show help
 
