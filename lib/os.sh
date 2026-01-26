@@ -37,7 +37,11 @@ pkg_install() {
     
     case "$OS" in
         arch)
-            paru -S --noconfirm --needed "${packages[@]}"
+            if command -v paru >/dev/null 2>&1 && paru --version >/dev/null 2>&1; then
+                paru -S --noconfirm --needed "${packages[@]}"
+            else
+                sudo pacman -S --noconfirm --needed "${packages[@]}"
+            fi
             ;;
         ubuntu)
             sudo apt-get update || error_exit "apt-get update failed. Check network connection."
@@ -59,7 +63,11 @@ pkg_update() {
     
     case "$OS" in
         arch)
-            paru -Syu --noconfirm
+            if command -v paru >/dev/null 2>&1 && paru --version >/dev/null 2>&1; then
+                paru -Syu --noconfirm
+            else
+                sudo pacman -Syu --noconfirm
+            fi
             ;;
         ubuntu)
             sudo apt-get update
