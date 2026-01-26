@@ -8,7 +8,7 @@ module_check() {
 
 module_install() {
     if [[ "$OS" != "arch" ]]; then
-        log_warn "Desktop module only supported on Arch"
+        log_warn "Desktop module only supported on Arch, skipping"
         return 0
     fi
     

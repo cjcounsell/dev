@@ -14,8 +14,14 @@ module_install() {
     
     if [[ "$OS" == "ubuntu" ]]; then
         mkdir -p "$HOME/.local/bin"
-        ln -sf "$(which fdfind)" "$HOME/.local/bin/fd" 2>/dev/null || true
-        ln -sf "$(which batcat)" "$HOME/.local/bin/bat" 2>/dev/null || true
+        
+        # Create convenience symlinks for Ubuntu package renames (optional, not errors)
+        if command -v fdfind >/dev/null 2>&1; then
+            ln -sf "$(which fdfind)" "$HOME/.local/bin/fd"
+        fi
+        if command -v batcat >/dev/null 2>&1; then
+            ln -sf "$(which batcat)" "$HOME/.local/bin/bat"
+        fi
         
         if ! command -v mise >/dev/null 2>&1; then
             log_info "Installing mise"

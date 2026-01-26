@@ -13,12 +13,20 @@ module_install() {
     
     if [[ "$OS" == "ubuntu" ]] && ! command -v starship >/dev/null 2>&1; then
         log_info "Installing Starship"
-        curl -sS https://starship.rs/install.sh | sh -s -- -y
+        local starship_installer
+        starship_installer=$(mktemp)
+        curl -fsSL https://starship.rs/install.sh -o "$starship_installer" || error_exit "Failed to download Starship installer"
+        sh "$starship_installer" -s -- -y || error_exit "Failed to install Starship"
+        rm -f "$starship_installer"
     fi
     
     if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
         log_info "Installing Oh-My-Zsh"
-        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+        local omz_installer
+        omz_installer=$(mktemp)
+        curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh -o "$omz_installer" || error_exit "Failed to download Oh-My-Zsh installer"
+        sh "$omz_installer" --unattended || error_exit "Failed to install Oh-My-Zsh"
+        rm -f "$omz_installer"
     fi
     
     local autosuggestions_dir="$HOME/.zsh/zsh-autosuggestions"

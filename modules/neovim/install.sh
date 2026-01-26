@@ -13,12 +13,12 @@ module_install() {
             ;;
         ubuntu)
             log_info "Installing Neovim from GitHub releases"
-            pushd "$HOME" >/dev/null
-            curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz
+            pushd "$HOME" >/dev/null || error_exit "Failed to cd to HOME"
+            curl -fLO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz || error_exit "Failed to download Neovim"
             sudo rm -rf /opt/nvim
-            sudo tar -C /opt -xzf nvim-linux-x86_64.tar.gz
+            sudo tar -C /opt -xzf nvim-linux-x86_64.tar.gz || error_exit "Failed to extract Neovim"
             rm nvim-linux-x86_64.tar.gz
-            popd >/dev/null
+            popd >/dev/null || true
             ;;
     esac
 }

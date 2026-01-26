@@ -8,7 +8,11 @@ module_check() {
 
 module_install() {
     log_info "Installing PHP via Herd"
-    curl -sS https://herd.laravel.com/install/linux | bash
+    local herd_installer
+    herd_installer=$(mktemp)
+    curl -fsSL https://herd.laravel.com/install/linux -o "$herd_installer" || error_exit "Failed to download Herd installer"
+    bash "$herd_installer" || error_exit "Failed to install Herd"
+    rm -f "$herd_installer"
     
     if [[ -n "${BW_INTELEPHENSE_ID:-}" ]]; then
         bw_ensure_session
