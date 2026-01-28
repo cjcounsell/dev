@@ -226,11 +226,97 @@ collect_modified_files() {
 }
 
 cmd_diff() {
+    if [[ "${1:-}" == "--help" ]]; then
+        cat <<'EOF'
+Usage: ./dev diff [PATH]
+
+Show differences between dotfiles in repo and deployed files.
+
+Without arguments, lists all files with their status (modified, new, unchanged).
+With a path argument, shows the actual diff for that file.
+
+Options:
+  --color    Force colored diff output (default when stdout is a terminal)
+  --no-color Disable colored diff output
+
+Examples:
+  ./dev diff                        List all file statuses
+  ./dev diff .aliases               Show diff for .aliases
+  ./dev diff .config/starship.toml  Show diff for starship config
+EOF
+        return 0
+    fi
+
     require_machine_config
     load_profile "$PROFILE"
 
+    local use_color=""
+    local file_path=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+        --color) use_color="always" ;;
+        --no-color) use_color="never" ;;
+        -*) log_warn "Unknown option: $1" ;;
+        *) file_path="$1" ;;
+        esac
+        shift
+    done
+
+    # Default color behavior: use color if stdout is a terminal
+    if [[ -z "$use_color" ]]; then
+        if [[ -t 1 ]]; then
+            use_color="always"
+        else
+            use_color="never"
+        fi
+    fi
+
     mapfile -t layers < <(build_dotfile_layers)
 
+    # If a file path is provided, show the actual diff
+    if [[ -n "$file_path" ]]; then
+        file_path="${file_path#./}"
+
+        local layer
+        layer=$(find_file_layer "$file_path")
+        local src="$DEV_ROOT/dotfiles/$layer/$file_path"
+        local dest="$HOME/$file_path"
+
+        if [[ ! -e "$src" ]]; then
+            log_error "File not found in dotfiles: $file_path"
+            echo "Searched layers: ${layers[*]}"
+            return 1
+        fi
+
+        if [[ ! -e "$dest" ]]; then
+            echo -e "${_BLUE}File not deployed yet:${_NC} $file_path"
+            echo "Source: dotfiles/$layer/$file_path"
+            echo ""
+            echo "--- (not deployed)"
+            echo "+++ dotfiles/$layer/$file_path"
+            return 0
+        fi
+
+        if diff -q "$src" "$dest" >/dev/null 2>&1; then
+            echo -e "${_GREEN}Files are identical:${_NC} $file_path"
+            return 0
+        fi
+
+        echo -e "${_YELLOW}Differences for:${_NC} $file_path"
+        echo "  Repo:     dotfiles/$layer/$file_path"
+        echo "  Deployed: ~/$file_path"
+        echo ""
+
+        # Show diff: repo vs deployed (deployed is "old", repo is "new")
+        diff --color="$use_color" -u "$dest" "$src" \
+            --label "deployed: ~/$file_path" \
+            --label "repo: dotfiles/$layer/$file_path" || true
+
+        return 0
+    fi
+
+    # No file path: list all file statuses
     echo "Comparing dotfiles (${layers[*]}) to deployed..."
     echo ""
 
@@ -262,6 +348,7 @@ cmd_diff() {
 
     if [[ -n "$modified_files" ]]; then
         echo ""
+        echo "Use './dev diff <path>' to see changes"
         echo "Use './dev pull <path>' to save local changes"
     fi
 }
@@ -859,7 +946,7 @@ Usage: ./dev [OPTIONS] COMMAND [ARGS...]
 Commands:
   init              First-time setup
   sync [PATH...]    Deploy dotfiles (all or specific files)
-  diff              Show differences between repo and deployed
+  diff [PATH]       Show differences between repo and deployed
   pull [PATH...]    Pull local changes back to dotfiles/common
   install [MODULE]  Install module(s)
   status            Show status
