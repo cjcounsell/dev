@@ -12,10 +12,11 @@ module_install() {
     log_info "Installing .NET SDK"
     mise use -g dotnet@latest
     
-    log_info "Installing CSharpier"
+    log_info "Installing CSharpier and EasyDotnet"
     pushd "$HOME" >/dev/null
     dotnet new tool-manifest --force 2>/dev/null || true
     dotnet tool install -g csharpier
+    dotnet tool install -g EasyDotnet
     popd >/dev/null
 }
 
