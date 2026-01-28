@@ -2,9 +2,10 @@
 
 Personal dev environment manager for Linux (Arch/Ubuntu). Manages dotfiles, shell configs, and software installation using modular bash scripts with profile-based configuration.
 
-## Commands
+## Quick Reference
 
 ```bash
+# Commands
 ./dev                   # Show status
 ./dev init              # First-time setup (select profile)
 ./dev sync              # Deploy dotfiles
@@ -14,140 +15,261 @@ Personal dev environment manager for Linux (Arch/Ubuntu). Manages dotfiles, shel
 ./dev diff              # Show differences between repo and deployed
 ./dev pull <path>       # Pull local changes back to dotfiles
 ./dev list              # List available modules
+./dev show <module>     # Show module details
+
+# Linting (MUST pass before commits)
+shellcheck dev lib/*.sh modules/*/install.sh
+
+# Manual verification
+./dev --dry-run sync
+./dev doctor
 ```
 
-## Linting
+No automated test suite. Verification: shellcheck + dry-run + doctor.
 
-```bash
-shellcheck dev lib/*.sh modules/*/install.sh  # Lint all scripts
-```
-
-No automated tests. Manual verification: `./dev --dry-run sync` and `./dev doctor`.
-
-## Structure
+## Project Structure
 
 ```
 dev/
-├── dev                         # Main CLI (~936 lines)
+├── dev                             # Main CLI (entrypoint)
 ├── config/
-│   ├── packages.conf           # Package definitions by OS
-│   └── profiles/{wsl,omarchy}.conf
-├── modules/{name}/             # Install modules
-│   ├── meta                    # DESCRIPTION, DEPENDS, PROFILES
-│   └── install.sh              # module_check(), module_install()
+│   ├── packages.conf               # Package definitions by OS
+│   └── profiles/{wsl,omarchy}.conf # Profile configurations
+├── modules/{name}/                 # Install modules
+│   ├── meta                        # DESCRIPTION, DEPENDS, PROFILES
+│   └── install.sh                  # module_check(), module_install()
 ├── dotfiles/{common,wsl,omarchy,{machine},work}/
-├── lib/{common,os,config,modules,state}.sh
-└── .local/machine.conf         # Local config (gitignored)
+├── lib/
+│   ├── common.sh                   # Logging, validation, safe ops
+│   ├── os.sh                       # OS detection, package management
+│   ├── config.sh                   # Config loading
+│   ├── modules.sh                  # Module discovery/execution
+│   └── state.sh                    # State tracking
+└── .local/                         # Gitignored local state
+    ├── machine.conf                # Machine configuration
+    └── state                       # Module install state
 ```
 
 ## Code Style
 
-Every script starts with:
+### Script Headers (REQUIRED)
+
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
+```
+
+Library scripts also source dependencies:
+```bash
 source "$DEV_ROOT/lib/common.sh"
 source "$DEV_ROOT/lib/os.sh"
 ```
 
-**Variables**: `UPPER_CASE` (globals), `lower_case` (locals), `_PREFIXED` (internal)
+### Naming Conventions
 
-**Functions**: `snake_case`, namespaced (`log_*`, `pkg_*`, `module_*`, `state_*`)
+| Type | Convention | Example |
+|------|------------|---------|
+| Global variables | `UPPER_CASE` | `DEV_ROOT`, `PROFILE`, `OS` |
+| Local variables | `lower_case` | `local module`, `local dest` |
+| Internal/private | `_PREFIXED` | `_BACKUP_SESSION_DIR`, `_LOG_LEVELS` |
+| Functions | `snake_case` | `log_info`, `module_check` |
+| Namespaced funcs | `prefix_action` | `log_*`, `pkg_*`, `module_*`, `state_*`, `sync_*` |
 
-### Key Functions
+### Variable Usage
 
 ```bash
-# Logging
-log_info "message"    log_warn "message"    log_error "message"    log_success "message"
+# ALWAYS quote variables
+"$var"              # Correct
+$var                # WRONG - unquoted
 
-# Validation (exit on failure)
-require_command git "msg"    require_dir "/path"    require_file "/path"
+# ALWAYS use [[ ]] for tests
+[[ -f "$file" ]]    # Correct
+[ -f "$file" ]      # WRONG - POSIX test
 
-# Safe ops (auto backup)
-safe_copy "$src" "$dest"    safe_remove "$path"
-
-# Package mgmt
-OS=$(detect_os)             # arch|ubuntu|unknown
-install_packages "category" # From packages.conf: category_common + category_$OS
+# ALWAYS use $() for command substitution
+result=$(command)   # Correct
+result=`command`    # WRONG - backticks
 ```
 
-### Patterns
+### Control Flow Patterns
 
 ```bash
-# Short-circuit
+# Short-circuit (preferred for simple conditions)
 [[ -z "$VAR" ]] && echo "empty"
-command -v nvim >/dev/null 2>&1 && echo "found"
+command -v tool >/dev/null 2>&1 && echo "found"
+[[ -d "$dir" ]] || error_exit "Missing: $dir"
 
-# Error block
-[[ -d "$src" ]] || { log_error "Missing"; exit 1; }
+# Error block (for multi-line error handling)
+[[ -d "$src" ]] || {
+    log_error "Missing directory: $src"
+    exit 1
+}
 
-# OS-specific
+# OS-specific branching
 case "$OS" in
-    arch) install_packages "neovim" ;;
+    arch)   install_packages "neovim" ;;
     ubuntu) curl -LO https://... ;;
+    *)      error_exit "Unsupported OS: $OS" ;;
 esac
 ```
 
-## Modules
+### Function Patterns
 
-### meta file
 ```bash
-DESCRIPTION="Human readable description"
-DEPENDS=(core cli-tools)  # Installed first
-PROFILES=()               # Empty = all profiles
+# Always declare locals
+my_function() {
+    local arg1="$1"
+    local result
+    result=$(some_command)
+    echo "$result"
+}
+
+# Check command existence
+command -v tool >/dev/null 2>&1
 ```
 
-### install.sh
+## Core Library Functions
+
+### Logging (lib/common.sh)
+```bash
+log_debug "message"    # Only if LOG_LEVEL=DEBUG
+log_info "message"     # Standard info
+log_warn "message"     # Warnings to stderr
+log_error "message"    # Errors to stderr
+log_success "message"  # Success with green [OK]
+log_dry "message"      # Dry-run preview
+```
+
+### Validation (exit on failure)
+```bash
+require_command git "msg"     # Exits if command missing
+require_dir "/path"           # Exits if directory missing
+require_file "/path"          # Exits if file missing
+error_exit "message" [code]   # Log error and exit
+```
+
+### Safe Operations (auto backup)
+```bash
+safe_copy "$src" "$dest"      # Backup dest, then copy
+safe_remove "$path"           # Backup, then remove
+```
+
+### Package Management (lib/os.sh)
+```bash
+OS=$(detect_os)               # Returns: arch|ubuntu|unknown
+ENV=$(detect_environment)     # Returns: wsl|native
+pkg_install pkg1 pkg2         # Install via pacman/apt
+install_packages "category"   # From packages.conf: category_common + category_$OS
+```
+
+## Module System
+
+### Module Structure
+```
+modules/{name}/
+├── meta        # Metadata (sourced as bash)
+└── install.sh  # Installation script
+```
+
+### meta File Format
+```bash
+DESCRIPTION="Human readable description"
+DEPENDS=(core cli-tools)  # Dependencies (installed first)
+PROFILES=()               # Empty = all profiles; or (wsl) / (omarchy)
+```
+
+### install.sh Requirements
 ```bash
 #!/usr/bin/env bash
+set -euo pipefail
 
-module_check() { command -v tool >/dev/null 2>&1; }
+# REQUIRED: Check if module is already installed
+module_check() {
+    command -v tool >/dev/null 2>&1
+}
 
+# REQUIRED: Installation logic
 module_install() {
     install_packages "category"
+    # Additional setup...
+}
+
+# OPTIONAL: Update logic
+module_update() {
+    # Update commands...
 }
 ```
 
-## Dotfile Layers
+### Module Best Practices
+- Use `require_command` for dependencies: `require_command mise "mise required (install cli-tools first)"`
+- Use `log_info` for progress messages
+- Use `error_exit` for fatal errors
+- Download to temp files, clean up after: `local tmp=$(mktemp); curl ... -o "$tmp"; ...; rm -f "$tmp"`
 
-Precedence (later overrides): `common → profile → machine → windows → work`
-
-- `common/` - All profiles
-- `wsl/`, `omarchy/` - Profile-specific
-- `{machine}/` - Machine-specific (g14, desktop)
-- `windows/` - Win configs (INCLUDE_WINDOWS=true)
-- `work/` - Work submodule (INCLUDE_WORK=true)
-
-## packages.conf
+## packages.conf Format
 
 ```bash
-core_common=(git)
-core_arch=(base-devel)
-core_ubuntu=(build-essential)
+# Format: category_os=(packages...)
+core_common=(git)           # All OSes
+core_arch=(base-devel)      # Arch only
+core_ubuntu=(build-essential) # Ubuntu only
+
+# Usage: install_packages "core"
+# Installs: core_common + core_$OS
 ```
 
-## Anti-Patterns
+## Dotfile Layer System
 
-- **Don't** use `cd` in scripts (use absolute paths or subshells)
-- **Don't** use unquoted variables: `"$var"` not `$var`
-- **Don't** use `[ ]` for tests: use `[[ ]]`
-- **Don't** use backticks: use `$(command)`
-- **Don't** modify `$HOME` directly in modules; use dotfiles layers
-- **Don't** hardcode package names; use packages.conf
+Precedence (later overrides earlier):
+1. `common/` - All profiles
+2. `wsl/` or `omarchy/` - Profile-specific
+3. `{machine}/` - Machine-specific (matches MACHINE_NAME)
+4. `windows/` - Windows configs (INCLUDE_WINDOWS=true)
+5. `work/` - Work layer (INCLUDE_WORK=true, highest precedence)
 
-## Git Submodules
+## Anti-Patterns (AVOID)
 
 ```bash
-git submodule update --init --recursive
+# DON'T use cd in scripts (breaks on errors)
+cd /some/dir && command     # WRONG
+command /some/dir/file      # Use absolute paths
+
+# DON'T leave variables unquoted
+rm -rf $path                # WRONG - word splitting
+rm -rf "$path"              # Correct
+
+# DON'T use [ ] for tests
+[ -f "$file" ]              # WRONG
+[[ -f "$file" ]]            # Correct
+
+# DON'T hardcode package names in modules
+sudo pacman -S neovim       # WRONG
+install_packages "neovim"   # Correct - uses packages.conf
+
+# DON'T modify $HOME directly in modules
+echo "config" > ~/.zshrc    # WRONG
+# Use dotfiles layers instead
+
+# DON'T use backticks
+result=`command`            # WRONG
+result=$(command)           # Correct
 ```
 
 ## Machine Config (.local/machine.conf)
 
 ```bash
-PROFILE="wsl"
-MACHINE_NAME="my-laptop"
-EXTRA_MODULES=(php dotnet)
-SKIP_MODULES=()
-INCLUDE_WINDOWS=false
-INCLUDE_WORK=true
+PROFILE="wsl"                  # Required: wsl or omarchy
+MACHINE_NAME="my-laptop"       # Required: for machine-specific dotfiles
+EXTRA_MODULES=(php dotnet)     # Optional: add to profile modules
+SKIP_MODULES=()                # Optional: exclude from profile
+INCLUDE_WINDOWS=false          # Include Windows desktop configs
+INCLUDE_WORK=true              # Include work dotfiles layer
 ```
+
+## Git Submodules
+
+```bash
+git submodule update --init --recursive  # Initialize submodules
+```
+
+The `work` dotfiles layer is a private submodule.
