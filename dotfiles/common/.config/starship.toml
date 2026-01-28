@@ -73,6 +73,9 @@ crust = "#11111b"
 [package]
 disabled = true
 
+[git_status]
+ignore_submodules = true
+
 [time]
 disabled = false
 format = '[\[ $time \]]($style)'
