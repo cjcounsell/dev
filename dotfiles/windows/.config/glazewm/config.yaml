@@ -197,14 +197,12 @@ keybindings:
     bindings: ["alt+enter"]
 
   - commands: ["shell-exec chrome"]
-    bindings: ["alt+b"]
+    bindings: ["alt+shift+b"]
   - commands: ["shell-exec chrome --app=https://youtube.com"]
-    bindings: ["alt+y"]
+    bindings: ["alt+shift+y"]
   # Focus the next/previous workspace defined in `workspaces` config.
   - commands: ["focus --next-workspace"]
     bindings: ["alt+s"]
-  - commands: ["shell-exec chrome --app=https://claude.ai"]
-    bindings: ["alt+a"]
   # Focus the workspace that last had focus.
   - commands: ["focus --recent-workspace"]
     bindings: ["alt+d"]
