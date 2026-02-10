@@ -3,7 +3,7 @@
     "google_auth": false,
     "agents": {
         "sisyphus": {
-            "model": "github-copilot/claude-opus-4.5"
+            "model": "github-copilot/claude-opus-4.6"
         },
         "oracle": {
             "model": "github-copilot/gpt-5.2"
@@ -18,13 +18,13 @@
             "model": "google/gemini-3-flash"
         },
         "prometheus": {
-            "model": "github-copilot/claude-opus-4.5"
+            "model": "github-copilot/claude-opus-4.6"
         },
         "metis": {
             "model": "github-copilot/claude-sonnet-4.5"
         },
         "momus": {
-            "model": "github-copilot/claude-opus-4.5"
+            "model": "github-copilot/claude-opus-4.6"
         },
         "atlas": {
             "model": "github-copilot/claude-sonnet-4.5"
