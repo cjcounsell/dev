@@ -1,0 +1,3 @@
+# Allow user to toggle touchpad via sysfs inhibited interface
+# Matches ASUS touchpad (vendor 2808, product 0218)
+ACTION=="add|change", SUBSYSTEM=="input", ATTR{id/vendor}=="2808", ATTR{id/product}=="0218", ATTR{name}=="*Touchpad", RUN+="/bin/chmod 0666 /sys%p/inhibited"

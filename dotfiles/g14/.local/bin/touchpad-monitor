@@ -1,28 +1,50 @@
 #!/bin/bash
 # Monitor for USB device changes and toggle touchpad
 # For ASUS G14 with Logitech wireless mouse
+#
+# Uses kernel sysfs inhibited interface instead of hyprctl keyword
+# (hyprctl keyword device[...]:enabled is broken in Hyprland 0.53+)
+#
+# Requires udev rule: /etc/udev/rules.d/99-touchpad-inhibit.rules
 
-TOUCHPAD="asuf1208:00-2808:0218-touchpad"
 STATE_FILE="/tmp/touchpad-state"
+
+find_touchpad_inhibit() {
+    for input in /sys/class/input/input*; do
+        if [[ "$(cat "$input/name" 2>/dev/null)" == "ASUF1208:00 2808:0218 Touchpad" ]]; then
+            echo "$input/inhibited"
+            return 0
+        fi
+    done
+    return 1
+}
+
+INHIBIT_PATH=$(find_touchpad_inhibit)
+if [[ -z "$INHIBIT_PATH" ]]; then
+    echo "ERROR: Could not find touchpad sysfs path" >&2
+    exit 1
+fi
 
 check_and_toggle() {
     sleep 1  # Let devices settle
-    
+
     if hyprctl devices -j | jq -e '.mice[] | select(.name | test("logitech"; "i"))' > /dev/null 2>&1; then
         NEW_STATE="disabled"
     else
         NEW_STATE="enabled"
     fi
-    
+
     LAST_STATE=$(cat "$STATE_FILE" 2>/dev/null)
-    
+
     if [[ "$LAST_STATE" != "$NEW_STATE" ]]; then
         echo "$NEW_STATE" > "$STATE_FILE"
         if [[ "$NEW_STATE" == "disabled" ]]; then
-            hyprctl keyword "device[$TOUCHPAD]:enabled" 0
+            echo 1 > "$INHIBIT_PATH" 2>/dev/null
             notify-send -t 2000 "Touchpad" "Disabled (mouse detected)"
         else
-            hyprctl keyword "device[$TOUCHPAD]:enabled" 1
+            echo 0 > "$INHIBIT_PATH" 2>/dev/null
+            # Hyprland doesn't auto-detect sysfs un-inhibit; kick it via keyword
+            hyprctl keyword "device[asuf1208:00-2808:0218-touchpad]:enabled" true > /dev/null 2>&1
             notify-send -t 2000 "Touchpad" "Enabled (no mouse)"
         fi
     fi
