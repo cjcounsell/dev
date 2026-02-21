@@ -60,3 +60,55 @@ systemctl --user stop touchpad-monitor     # Temporarily disable
 systemctl --user start touchpad-monitor    # Re-enable
 systemctl --user disable touchpad-monitor  # Stop running on boot
 ```
+
+## GPU Device Symlinks
+
+Creates stable `/dev/dri/amd-igpu` and `/dev/dri/nvidia-dgpu` symlinks for the dual GPU setup (AMD iGPU + NVIDIA dGPU), so applications can reference GPUs by name instead of card number.
+
+### Files
+
+- `etc/udev/rules.d/amd-igpu-dev-path.rules` - AMD iGPU symlink (requires manual install)
+- `etc/udev/rules.d/nvidia-dgpu-dev-path.rules` - NVIDIA dGPU symlink (requires manual install)
+
+### Setup
+
+```bash
+sudo cp ~/personal/dev/dotfiles/g14/etc/udev/rules.d/amd-igpu-dev-path.rules /etc/udev/rules.d/
+sudo cp ~/personal/dev/dotfiles/g14/etc/udev/rules.d/nvidia-dgpu-dev-path.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+## Power Saver
+
+Script to toggle between battery and AC power profiles. Manages services (docker, CUPS, nvidia-persistenced), bluetooth, disk write batching, PCI/NVMe power management, and Hyprland eye candy.
+
+### Files
+
+- `.local/bin/power-saver` - Power profile toggle script
+
+### Usage
+
+```bash
+power-saver battery   # Switch to battery profile
+power-saver ac        # Switch to AC profile
+```
+
+### What It Does
+
+**Battery mode:**
+- Stops docker, containerd, CUPS, nvidia-persistenced (if safe)
+- Disables bluetooth (if nothing connected)
+- Enables disk write batching and PCI/NVMe runtime PM
+- Disables Hyprland blur and shadows
+
+**AC mode:**
+- Starts docker, containerd, nvidia-persistenced
+- Re-enables bluetooth
+- Restores disk write defaults
+- Re-enables Hyprland blur and shadows
+
+### Requirements
+
+- `sudo` access for service management and sysfs writes
+- `rfkill` for bluetooth control

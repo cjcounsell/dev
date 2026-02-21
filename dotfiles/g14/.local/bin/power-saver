@@ -1,0 +1,69 @@
+#!/bin/bash
+# Power-saver script for rog-control-center
+# Manages services and bluetooth based on power state
+
+bluetooth_has_connection() {
+    busctl tree org.bluez 2>/dev/null | grep -q "/dev_" && \
+    dbus-send --system --print-reply --dest=org.bluez / \
+        org.freedesktop.DBus.ObjectManager.GetManagedObjects 2>/dev/null | \
+        grep -q '"Connected".*true'
+}
+
+docker_has_containers() {
+    [[ $(docker ps -q 2>/dev/null | wc -l) -gt 0 ]]
+}
+
+case "${1:-}" in
+    battery|bat)
+        # Stop services (only docker/containerd if nothing running)
+        if ! docker_has_containers; then
+            sudo systemctl stop docker
+            sudo systemctl stop containerd
+        fi
+        sudo systemctl stop cups
+        sudo systemctl stop cups-browsed
+        sudo systemctl stop nvidia-persistenced
+
+        # Bluetooth - disable if nothing connected
+        bluetooth_has_connection || rfkill block bluetooth
+
+        # Disk - batch writes for power saving
+        echo 5 | sudo tee /proc/sys/vm/laptop_mode > /dev/null
+        echo 1500 | sudo tee /proc/sys/vm/dirty_writeback_centisecs > /dev/null
+
+        # PCI - enable runtime PM for all devices
+        for dev in /sys/bus/pci/devices/*/power/control; do
+            echo auto | sudo tee "$dev" > /dev/null 2>&1
+        done
+
+        # NVMe - enable power management
+        for dev in /sys/class/nvme/nvme*/device/power/control; do
+            echo auto | sudo tee "$dev" > /dev/null 2>&1
+        done
+
+        # Hyprland - disable eye candy for power saving
+        hyprctl keyword decoration:blur:enabled false > /dev/null 2>&1
+        hyprctl keyword decoration:shadow:enabled false > /dev/null 2>&1
+        hyprctl keyword misc:vrr 1 > /dev/null 2>&1
+        ;;
+    ac)
+        # Start services
+        sudo systemctl start docker
+        sudo systemctl start containerd
+        sudo systemctl start nvidia-persistenced
+
+        # Bluetooth - re-enable
+        rfkill unblock bluetooth
+
+        # Disk - disable laptop_mode for performance
+        echo 0 | sudo tee /proc/sys/vm/laptop_mode > /dev/null
+        echo 500 | sudo tee /proc/sys/vm/dirty_writeback_centisecs > /dev/null
+
+        # Hyprland - re-enable eye candy
+        hyprctl keyword decoration:blur:enabled true > /dev/null 2>&1
+        hyprctl keyword decoration:shadow:enabled true > /dev/null 2>&1
+
+        # PCI - leave on for performance (optional, auto is fine too)
+        # NVMe - leave auto (safe for both modes)
+        ;;
+esac
