@@ -9,6 +9,24 @@
 
 STATE_FILE="/tmp/touchpad-state"
 
+# Discover Hyprland socket at runtime (needed when running as a systemd service
+# that starts before Hyprland and doesn't inherit session env vars)
+ensure_hyprland_env() {
+    if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+        return 0
+    fi
+    local sig_dir="/run/user/$(id -u)/hypr"
+    if [[ -d "$sig_dir" ]]; then
+        local sig
+        sig=$(ls -1 "$sig_dir" 2>/dev/null | head -1)
+        if [[ -n "$sig" ]]; then
+            export HYPRLAND_INSTANCE_SIGNATURE="$sig"
+            return 0
+        fi
+    fi
+    return 1
+}
+
 find_touchpad_inhibit() {
     for input in /sys/class/input/input*; do
         if [[ "$(cat "$input/name" 2>/dev/null)" == "ASUF1208:00 2808:0218 Touchpad" ]]; then
@@ -27,6 +45,11 @@ fi
 
 check_and_toggle() {
     sleep 1  # Let devices settle
+
+    # Re-discover Hyprland socket each cycle (handles restarts)
+    if ! ensure_hyprland_env; then
+        return
+    fi
 
     if hyprctl devices -j | jq -e '.mice[] | select(.name | test("logitech"; "i"))' > /dev/null 2>&1; then
         NEW_STATE="disabled"
