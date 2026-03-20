@@ -5,6 +5,9 @@
         "sisyphus": {
             "model": "github-copilot/claude-opus-4.6"
         },
+        "hephaestus": {
+            "model": "github-copilot/gpt-5.2-codex"
+        },
         "oracle": {
             "model": "github-copilot/gpt-5.2"
         },
