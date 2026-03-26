@@ -10,6 +10,9 @@ gclp() { git clone git@github.com:cjcounsell/"$1".git; }
 alias lg="lazygit"
 alias ls="eza --icons -l -T -L=1"
 alias lzd="lazydocker"
+alias oc="opencode"
+alias occ="opencode -c"
+alias ocs="opencode serve --port 5096"
 alias sail='[ -f sail ] && sh sail || sh vendor/bin/sail'
 alias v="nvim"
 alias vz="NVIM_APPNAME=lazy nvim"
