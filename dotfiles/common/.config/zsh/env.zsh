@@ -21,3 +21,11 @@ export CODE_DIRS="$HOME:$HOME/personal:$HOME/work:$HOME/vaults"
 
 # WezTerm integration
 export SNACKS_WEZTERM=true
+
+# Editor used by CLI
+export SUDO_EDITOR="$EDITOR"
+export BAT_THEME=ansi
+
+# Duplicated from .config/uwsm/env so SSH works too
+export OMARCHY_PATH=$HOME/.local/share/omarchy
+export PATH=$OMARCHY_PATH/bin:$PATH:$HOME/.local/bin
