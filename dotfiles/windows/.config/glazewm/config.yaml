@@ -85,6 +85,9 @@ window_rules:
       - window_title: { regex: "[Pp]icture.in.[Pp]icture" }
         window_class: { regex: "Chrome_WidgetWin_1|MozillaDialogClass" }
 
+      # Ignore WSLg windows (Linux GUI apps rendered via Remote Desktop Client).
+      - window_process: { equals: "msrdc" }
+
       # Ignore rules for various 3rd-party apps.
       - window_process: { equals: "PowerToys.PowerAccent" }
       - window_process: { equals: "Lively" }
