@@ -28,7 +28,6 @@ alias v="nvim"
 
 # Git
 alias g='git'
-alias gl='git pull'
 alias gcm='git commit -m'
 alias gcam='git commit -a -m'
 alias gcad='git commit -a --amend'

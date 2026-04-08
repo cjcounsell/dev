@@ -1,5 +1,9 @@
 #!/usr/bin/env zsh
 
+# Initialize Oh My Zsh with plugins
+plugins=(git)
+[[ -f "$ZSH/oh-my-zsh.sh" ]] && source "$ZSH/oh-my-zsh.sh"
+
 command -v proxyoff >/dev/null 2>&1 && proxyoff
 
 # Initialize tools if installed

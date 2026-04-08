@@ -3,6 +3,7 @@
 export EDITOR="nvim"
 export GIT_EDITOR="$EDITOR"
 export XDG_CONFIG_HOME="$HOME/.config"
+export ZSH="$HOME/.oh-my-zsh"
 export DOTFILES="$HOME/.dotfiles"
 
 # Tool-specific paths
