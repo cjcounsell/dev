@@ -5,7 +5,6 @@ local configs=(
   "$HOME/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh"
   "$HOME/.zshenv_work"
   "$HOME/.aliases_work"
-  "$HOME/.proxy"
 )
 for config in "${configs[@]}"; do
   [[ -f "$config" ]] && source "$config"
