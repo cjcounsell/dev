@@ -8,11 +8,11 @@ Contains files that are meant to be copied into `/etc` on this machine, mainly u
 
 ## Design
 
-Keeps privileged host rules outside the synced home tree while still versioning them in dotfiles.
+Keeps privileged host rules outside the stowed home tree while still versioning them in dotfiles.
 
 ## Flow
 
-After sync, the user copies selected rules into place and reloads udev so device naming and input policies take effect.
+After `./dev stow`, the user copies selected rules into place and reloads udev so device naming and input policies take effect.
 
 ## Integration
 

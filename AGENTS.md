@@ -6,7 +6,7 @@ Personal Linux environment manager (Arch/Ubuntu) written in Bash. `./dev` is the
 
 ```bash
 shellcheck dev lib/*.sh modules/*/install.sh
-./dev --dry-run sync
+./dev --dry-run stow
 ./dev doctor
 ```
 
@@ -17,13 +17,12 @@ shellcheck dev lib/*.sh modules/*/install.sh
 ## CLI Facts Agents Commonly Guess Wrong
 
 ```bash
-./dev                   # default: status
-./dev init              # writes .local/machine.conf after choosing wsl/omarchy
-./dev install [MODULE...] # resolves module dependencies; no args = profile + EXTRA_MODULES - SKIP_MODULES
-./dev sync [PATH...]    # deploy all or selected dotfiles; aborts on local modifications unless --force
-./dev diff [PATH]       # compare repo dotfiles to deployed files
-./dev pull <path...>    # copy local changes back into the layer selected by find_file_layer
-./dev pull --all        # pull every locally modified tracked dotfile
+./dev                      # default: status
+./dev init                 # writes .local/machine.conf after choosing wsl/omarchy
+./dev install [MODULE...]  # resolves module dependencies; no args = profile + EXTRA_MODULES - SKIP_MODULES
+./dev stow                 # deploy dotfiles as GNU Stow symlinks
+./dev --force stow         # stow + adopt existing local files
+./dev promote <path>       # copy a linked/local file into MACHINE_NAME layer and restow
 ./dev list | ./dev show <module> | ./dev update | ./dev doctor
 ```
 
@@ -31,7 +30,7 @@ Global flags parsed before the command: `--dry-run|-n`, `--force|-f`, `--yes|-y`
 
 ## Architecture Boundaries
 
-- `config/profiles/{wsl,omarchy}.conf` defines `PROFILE_MODULES`, `PROFILE_DOTFILES`, optional modules, and post-sync hooks.
+- `config/profiles/{wsl,omarchy}.conf` defines `PROFILE_MODULES`, `PROFILE_DOTFILES`, optional modules, and profile hooks.
 - `config/packages.conf` uses `{category}_{common|arch|ubuntu}` arrays; modules should call `install_packages "category"`, not raw `pacman`/`apt` for packaged deps.
 - `modules/<name>/meta` contains `DESCRIPTION`, `DEPENDS=()`, `PROFILES=()`; empty `PROFILES` means all profiles.
 - `modules/<name>/install.sh` should define `module_check`, `module_install`, optional `module_update`.
@@ -41,9 +40,9 @@ Global flags parsed before the command: `--dry-run|-n`, `--force|-f`, `--yes|-y`
 ## Profiles and Dotfile Layers
 
 - `wsl`: modules `core shell cli-tools ssh neovim tmux node secrets`; dotfiles `common wsl`; optional `php dotnet`.
-- `omarchy`: same base plus `desktop networkmanager`; dotfiles `common omarchy`; optional `php dotnet`; post-sync reloads Hyprland with `hyprctl`.
+- `omarchy`: same base plus `desktop networkmanager`; dotfiles `common omarchy`; optional `php dotnet`; post-stow hook reloads Hyprland with `hyprctl`.
 - Layer precedence from low to high: `PROFILE_DOTFILES` (`common`, then profile) → existing `dotfiles/$MACHINE_NAME` (e.g. `g14`) → `windows` if `INCLUDE_WINDOWS=true` → `work` if `INCLUDE_WORK=true`.
-- `sync` backs up overwritten items under `~/.config-backups`; selected-file `sync_specific_files` and `pull` use direct `cp`/`rm` paths, so review target layer/path carefully.
+- Dotfiles are managed with GNU Stow symlinks. `stow` applies all active layers; `promote` is used when a shared file needs to become machine-specific.
 
 ## Module Gotchas
 
@@ -63,9 +62,17 @@ Global flags parsed before the command: `--dry-run|-n`, `--force|-f`, `--yes|-y`
 
 ## Repository Map
 
+- `dev`: CLI entrypoint (init/install/stow/promote/list/show/update/doctor)
+- `lib/`: shared runtime helpers (logging, OS/config loading, module orchestration)
+- `config/`: package categories and profile manifests
+- `modules/`: idempotent install units with metadata and install scripts
+- `dotfiles/`: layered dotfile sources linked into `$HOME` by GNU Stow
+- `.local/`: machine-local generated state (gitignored)
+
 A full codemap is available at `codemap.md` in the project root.
 
 Before working on any task, read `codemap.md` to understand:
+
 - Project architecture and entry points
 - Directory responsibilities and design patterns
 - Data flow and integration points between modules

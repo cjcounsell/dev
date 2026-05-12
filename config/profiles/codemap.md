@@ -10,8 +10,8 @@ Small executable Bash manifests with exported scalar metadata and arrays. The pa
 
 ## Data & Control Flow
 
-`load_profile` sources exactly one profile based on `.local/machine.conf`. `dev sync` uses `PROFILE_MODULES`/`PROFILE_DOTFILES` to determine installation and layer precedence, then conditionally invokes a post-sync hook matching `PROFILE_NAME`.
+`load_profile` sources exactly one profile based on `.local/machine.conf`. `dev stow` uses `PROFILE_DOTFILES` to determine layer precedence and conditionally invokes a profile hook matching `PROFILE_NAME` after stow completion.
 
 ## Integration Points
 
-Interfaces with `dev init`, `lib/config.sh`, `lib/modules.sh`, and `dev sync`. Current profiles: `wsl` (WSL2, no GUI) and `omarchy` (Arch desktop with Hyprland reload via `hyprctl`).
+Interfaces with `dev init`, `lib/config.sh`, `lib/modules.sh`, and `dev stow`. Current profiles: `wsl` (WSL2, no GUI) and `omarchy` (Arch desktop with Hyprland reload via `hyprctl`).

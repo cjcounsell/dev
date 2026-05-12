@@ -12,7 +12,7 @@ Keeps WSL-only hooks separate from the common layer so native Linux hosts avoid 
 
 ## Flow
 
-The profile includes this layer automatically, then its files override or extend shared configs during sync.
+The profile includes this layer automatically, then its files override or extend shared configs when `./dev stow` links active layers into `$HOME`.
 
 ## Integration
 

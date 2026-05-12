@@ -55,532 +55,7 @@ cmd_init() {
     echo ""
     echo "Next steps:"
     echo "  ./dev install    # Install modules"
-    echo "  ./dev sync       # Deploy dotfiles"
-}
-
-cmd_sync() {
-    if [[ "${1:-}" == "--help" ]]; then
-        cat <<'EOF'
-Usage: ./dev sync [OPTIONS] [PATH...]
-
-Deploy dotfiles from repo to home directory.
-
-Options:
-  -n, --dry-run    Preview changes without applying
-  -f, --force      Overwrite local changes (prompts for confirmation)
-  -y, --yes        Skip confirmation prompts
-
-Layers (in order of precedence):
-  common → profile → machine → windows → work
-
-Examples:
-  ./dev sync              Deploy all, abort if local changes exist
-  ./dev sync --force      Deploy all, overwrite local changes
-  ./dev sync --dry-run    Preview what would be deployed
-  ./dev sync .aliases     Deploy specific file
-  ./dev sync .config/starship.toml .zshrc   Deploy multiple files
-EOF
-        return 0
-    fi
-
-    local paths=()
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-        --force | -f) FORCE=1 ;;
-        --dry-run | -n) DRY_RUN=1 ;;
-        -*) log_warn "Unknown option: $1" ;;
-        *) paths+=("$1") ;;
-        esac
-        shift
-    done
-
-    require_machine_config
-    load_profile "$PROFILE"
-
-    # If specific paths provided, sync only those files
-    if [[ ${#paths[@]} -gt 0 ]]; then
-        sync_specific_files "${paths[@]}"
-        return $?
-    fi
-
-    # Full sync from here
-    if [[ "${FORCE:-0}" == "1" ]] && [[ "${SKIP_CONFIRM:-0}" != "1" ]]; then
-        if ! confirm "This will overwrite local changes. Continue?"; then
-            log_info "Aborted"
-            return 0
-        fi
-    fi
-
-    log_info "Syncing dotfiles for profile: $PROFILE"
-
-    mapfile -t layers < <(build_dotfile_layers)
-
-    local current_hash
-    current_hash=$(calculate_dotfiles_hash "${layers[@]}")
-    local previous_hash
-    previous_hash=$(sync_get_hash)
-
-    if [[ "$current_hash" == "$previous_hash" ]] && [[ "$FORCE" != "1" ]]; then
-        log_info "Dotfiles unchanged, skipping"
-        return 0
-    fi
-
-    if [[ "$DRY_RUN" != "1" ]] && [[ "$FORCE" != "1" ]]; then
-        local modified_files
-        modified_files=$(collect_modified_files "${layers[@]}")
-
-        if [[ -n "$modified_files" ]]; then
-            log_error "Local modifications detected:"
-            while read -r file; do
-                echo "    $file"
-            done <<< "$modified_files"
-            echo ""
-            echo "To preserve changes: ./dev pull <path>"
-            echo "To overwrite anyway: ./dev sync --force"
-            exit 1
-        fi
-    fi
-
-    init_backup_session "sync-$(date +%Y%m%d-%H%M%S)"
-
-    for layer in "${layers[@]}"; do
-        local layer_dir="$DEV_ROOT/dotfiles/$layer"
-        if [[ -d "$layer_dir" ]]; then
-            log_info "Applying layer: $layer"
-            sync_layer "$layer_dir"
-        else
-            log_warn "Layer not found: $layer"
-        fi
-    done
-
-    if declare -f "${PROFILE_NAME}_post_sync" >/dev/null 2>&1; then
-        "${PROFILE_NAME}_post_sync"
-    fi
-
-    sync_set_hash "$current_hash"
-    cleanup_old_backups 5
-    log_success "Dotfiles synced"
-}
-
-compare_file_to_home() {
-    local src_file="$1"
-    local rel_path="$2"
-    local dest_file="$3"
-    
-    if [[ ! -e "$dest_file" ]]; then
-        echo "new:$rel_path"
-    elif ! diff -q "$src_file" "$dest_file" >/dev/null 2>&1; then
-        echo "modified:$rel_path"
-    else
-        echo "identical:$rel_path"
-    fi
-}
-
-compare_dotfiles_to_home() {
-    local layers=("$@")
-    local -A seen_files
-    local i
-
-    for ((i = ${#layers[@]} - 1; i >= 0; i--)); do
-        local layer="${layers[$i]}"
-        local layer_dir="$DEV_ROOT/dotfiles/$layer"
-        [[ ! -d "$layer_dir" ]] && continue
-
-        if [[ -d "$layer_dir/.config" ]]; then
-            while IFS= read -r -d '' src_file; do
-                local rel_path="${src_file#$layer_dir/}"
-                [[ -n "${seen_files[$rel_path]:-}" ]] && continue
-                seen_files[$rel_path]=1
-
-                local dest_file="$HOME/$rel_path"
-                compare_file_to_home "$src_file" "$rel_path" "$dest_file"
-            done < <(find "$layer_dir/.config" -type f -print0)
-        fi
-
-        if [[ -d "$layer_dir/.local" ]]; then
-            while IFS= read -r -d '' src_file; do
-                local rel_path="${src_file#$layer_dir/}"
-                [[ -n "${seen_files[$rel_path]:-}" ]] && continue
-                seen_files[$rel_path]=1
-
-                local dest_file="$HOME/$rel_path"
-                compare_file_to_home "$src_file" "$rel_path" "$dest_file"
-            done < <(find "$layer_dir/.local" -type f -print0)
-        fi
-
-        while IFS= read -r -d '' file; do
-            local name
-            name=$(basename "$file")
-            [[ -n "${seen_files[$name]:-}" ]] && continue
-            seen_files[$name]=1
-
-            local dest="$HOME/$name"
-            compare_file_to_home "$file" "$name" "$dest"
-        done < <(find "$layer_dir" -mindepth 1 -maxdepth 1 -name ".*" -type f -print0)
-    done
-}
-
-collect_modified_files() {
-    local layers=("$@")
-    compare_dotfiles_to_home "${layers[@]}" | grep "^modified:" | cut -d: -f2- | sort -u
-}
-
-cmd_diff() {
-    if [[ "${1:-}" == "--help" ]]; then
-        cat <<'EOF'
-Usage: ./dev diff [PATH]
-
-Show differences between dotfiles in repo and deployed files.
-
-Without arguments, lists all files with their status (modified, new, unchanged).
-With a path argument, shows the actual diff for that file.
-
-Options:
-  --color    Force colored diff output (default when stdout is a terminal)
-  --no-color Disable colored diff output
-
-Examples:
-  ./dev diff                        List all file statuses
-  ./dev diff .aliases               Show diff for .aliases
-  ./dev diff .config/starship.toml  Show diff for starship config
-EOF
-        return 0
-    fi
-
-    require_machine_config
-    load_profile "$PROFILE"
-
-    local use_color=""
-    local file_path=""
-
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-        --color) use_color="always" ;;
-        --no-color) use_color="never" ;;
-        -*) log_warn "Unknown option: $1" ;;
-        *) file_path="$1" ;;
-        esac
-        shift
-    done
-
-    # Default color behavior: use color if stdout is a terminal
-    if [[ -z "$use_color" ]]; then
-        if [[ -t 1 ]]; then
-            use_color="always"
-        else
-            use_color="never"
-        fi
-    fi
-
-    mapfile -t layers < <(build_dotfile_layers)
-
-    # If a file path is provided, show the actual diff
-    if [[ -n "$file_path" ]]; then
-        file_path="${file_path#./}"
-
-        local layer
-        layer=$(find_file_layer "$file_path")
-        local src="$DEV_ROOT/dotfiles/$layer/$file_path"
-        local dest="$HOME/$file_path"
-
-        if [[ ! -e "$src" ]]; then
-            log_error "File not found in dotfiles: $file_path"
-            echo "Searched layers: ${layers[*]}"
-            return 1
-        fi
-
-        if [[ ! -e "$dest" ]]; then
-            echo -e "${_BLUE}File not deployed yet:${_NC} $file_path"
-            echo "Source: dotfiles/$layer/$file_path"
-            echo ""
-            echo "--- (not deployed)"
-            echo "+++ dotfiles/$layer/$file_path"
-            return 0
-        fi
-
-        if diff -q "$src" "$dest" >/dev/null 2>&1; then
-            echo -e "${_GREEN}Files are identical:${_NC} $file_path"
-            return 0
-        fi
-
-        echo -e "${_YELLOW}Differences for:${_NC} $file_path"
-        echo "  Repo:     dotfiles/$layer/$file_path"
-        echo "  Deployed: ~/$file_path"
-        echo ""
-
-        # Show diff: repo vs deployed (deployed is "old", repo is "new")
-        diff --color="$use_color" -u "$dest" "$src" \
-            --label "deployed: ~/$file_path" \
-            --label "repo: dotfiles/$layer/$file_path" || true
-
-        return 0
-    fi
-
-    # No file path: list all file statuses
-    echo "Comparing dotfiles (${layers[*]}) to deployed..."
-    echo ""
-
-    local all_results
-    all_results=$(compare_dotfiles_to_home "${layers[@]}")
-
-    local modified_files new_files identical_count
-    modified_files=$(echo "$all_results" | grep "^modified:" | cut -d: -f2- | sort -u || true)
-    new_files=$(echo "$all_results" | grep "^new:" | cut -d: -f2- | sort -u || true)
-    identical_count=$(echo "$all_results" | grep -c "^identical:" || echo "0")
-
-    if [[ -n "$modified_files" ]]; then
-        echo -e "  ${_YELLOW}Modified:${_NC}"
-        echo "$modified_files" | while read -r f; do
-            [[ -n "$f" ]] && echo "    $f"
-        done
-        echo ""
-    fi
-
-    if [[ -n "$new_files" ]]; then
-        echo -e "  ${_BLUE}New (not deployed):${_NC}"
-        echo "$new_files" | while read -r f; do
-            [[ -n "$f" ]] && echo "    $f"
-        done
-        echo ""
-    fi
-
-    echo -e "  ${_GREEN}Unchanged:${_NC} $identical_count files"
-
-    if [[ -n "$modified_files" ]]; then
-        echo ""
-        echo "Use './dev diff <path>' to see changes"
-        echo "Use './dev pull <path>' to save local changes"
-    fi
-}
-
-find_file_layer() {
-    local file_path="$1"
-    mapfile -t layers < <(build_dotfile_layers)
-
-    local i
-    for ((i = ${#layers[@]} - 1; i >= 0; i--)); do
-        local layer="${layers[$i]}"
-        local full_path="$DEV_ROOT/dotfiles/$layer/$file_path"
-        if [[ -e "$full_path" ]]; then
-            echo "$layer"
-            return 0
-        fi
-    done
-    echo "common"
-}
-
-cmd_pull() {
-    require_machine_config
-    load_profile "$PROFILE"
-
-    local pull_all=0
-    local paths=()
-
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-        --all) pull_all=1 ;;
-        --dry-run | -n) DRY_RUN=1 ;;
-        *) paths+=("$1") ;;
-        esac
-        shift
-    done
-
-    if [[ $pull_all -eq 1 ]]; then
-        local layers
-        mapfile -t layers < <(build_dotfile_layers)
-
-        local modified
-        modified=$(collect_modified_files "${layers[@]}")
-
-        if [[ -z "$modified" ]]; then
-            log_info "No local modifications to pull"
-            return 0
-        fi
-
-        mapfile -t paths <<<"$modified"
-    fi
-
-    if [[ ${#paths[@]} -eq 0 ]]; then
-        echo "Usage: ./dev pull <path> [path...]"
-        echo "       ./dev pull --all"
-        echo ""
-        echo "Examples:"
-        echo "  ./dev pull .config/nvim/lua/config/options.lua"
-        echo "  ./dev pull .config/starship.toml .aliases"
-        echo "  ./dev pull --all"
-        exit 1
-    fi
-
-    log_info "Pulling local changes to dotfiles..."
-
-    local pulled=0
-    for path in "${paths[@]}"; do
-        [[ -z "$path" ]] && continue
-
-        path="${path#./}"
-
-        local src="$HOME/$path"
-
-        if [[ ! -e "$src" ]]; then
-            log_warn "Not found: $src"
-            continue
-        fi
-
-        local target_layer
-        target_layer=$(find_file_layer "$path")
-        local dest="$DEV_ROOT/dotfiles/$target_layer/$path"
-
-        if [[ "$DRY_RUN" == "1" ]]; then
-            log_dry "$path -> dotfiles/$target_layer/"
-            ((++pulled))
-            continue
-        fi
-
-        local dest_parent
-        dest_parent=$(dirname "$dest")
-        mkdir -p "$dest_parent"
-
-        if [[ -d "$src" ]]; then
-            rm -rf "$dest"
-            cp -r "$src" "$dest"
-        else
-            cp "$src" "$dest"
-        fi
-
-        echo "  $path -> dotfiles/$target_layer/"
-        ((++pulled))
-    done
-
-    if [[ $pulled -gt 0 ]]; then
-        log_success "Pulled $pulled item(s)"
-    fi
-}
-
-sync_specific_files() {
-    local paths=("$@")
-    local synced=0
-
-    log_info "Syncing specific files..."
-
-    for path in "${paths[@]}"; do
-        [[ -z "$path" ]] && continue
-
-        path="${path#./}"
-
-        local layer
-        layer=$(find_file_layer "$path")
-        local src="$DEV_ROOT/dotfiles/$layer/$path"
-
-        if [[ ! -e "$src" ]]; then
-            log_warn "Not found in dotfiles: $path"
-            continue
-        fi
-
-        local dest="$HOME/$path"
-
-        # Check for local modifications unless --force
-        if [[ -e "$dest" ]] && [[ "$FORCE" != "1" ]]; then
-            if ! diff -q "$src" "$dest" >/dev/null 2>&1; then
-                log_error "Local modification exists: $path"
-                echo "  Use --force to overwrite, or './dev pull $path' to save changes"
-                continue
-            fi
-        fi
-
-        if [[ "$DRY_RUN" == "1" ]]; then
-            log_dry "dotfiles/$layer/$path -> $path"
-            ((++synced))
-            continue
-        fi
-
-        local dest_parent
-        dest_parent=$(dirname "$dest")
-        mkdir -p "$dest_parent"
-
-        if [[ -d "$src" ]]; then
-            rm -rf "$dest"
-            cp -r "$src" "$dest"
-        else
-            cp "$src" "$dest"
-        fi
-
-        echo "  dotfiles/$layer/$path -> $path"
-        ((++synced))
-    done
-
-    if [[ $synced -gt 0 ]]; then
-        log_success "Synced $synced item(s)"
-    fi
-}
-
-sync_layer() {
-    local src="$1"
-
-    if [[ -d "$src/.config" ]]; then
-        mkdir -p "$HOME/.config"
-
-        while IFS= read -r -d '' dir; do
-            local name
-            name=$(basename "$dir")
-            local dest="$HOME/.config/$name"
-
-            log_debug "  .config/$name"
-            safe_remove "$dest"
-            if [[ "$DRY_RUN" == "0" ]]; then
-                cp -r "$dir" "$dest" || log_error "Failed to copy: $dir -> $dest"
-            fi
-        done < <(find "$src/.config" -mindepth 1 -maxdepth 1 -type d -print0)
-
-        while IFS= read -r -d '' file; do
-            local name
-            name=$(basename "$file")
-            local dest="$HOME/.config/$name"
-
-            log_debug "  .config/$name"
-            safe_copy "$file" "$dest"
-        done < <(find "$src/.config" -mindepth 1 -maxdepth 1 -type f -print0)
-    fi
-
-    if [[ -d "$src/.local" ]]; then
-        mkdir -p "$HOME/.local"
-
-        while IFS= read -r -d '' dir; do
-            local name
-            name=$(basename "$dir")
-            local dest="$HOME/.local/$name"
-
-            log_debug "  .local/$name"
-            safe_remove "$dest"
-            if [[ "$DRY_RUN" == "0" ]]; then
-                cp -r "$dir" "$dest" || log_error "Failed to copy: $dir -> $dest"
-            fi
-        done < <(find "$src/.local" -mindepth 1 -maxdepth 1 -type d -print0)
-    fi
-
-    while IFS= read -r -d '' file; do
-        local name
-        name=$(basename "$file")
-        local dest="$HOME/$name"
-
-        log_debug "  $name"
-        safe_copy "$file" "$dest"
-    done < <(find "$src" -mindepth 1 -maxdepth 1 -name ".*" -type f -print0)
-}
-
-calculate_dotfiles_hash() {
-    local layers=("$@")
-    local hash_input=""
-
-    for layer in "${layers[@]}"; do
-        local layer_dir="$DEV_ROOT/dotfiles/$layer"
-        if [[ -d "$layer_dir" ]]; then
-            local layer_hashes
-            layer_hashes=$(find "$layer_dir" -type f -print0 | sort -z | xargs -0 md5sum) || true
-            hash_input+="$layer_hashes"
-        fi
-    done
-
-    echo "$hash_input" | md5sum | cut -d' ' -f1
+    echo "  ./dev stow       # Deploy dotfiles"
 }
 
 parse_install_args() {
@@ -731,6 +206,117 @@ EOF
     execute_module_installs
 }
 
+cmd_stow() {
+    require_command stow
+    require_machine_config
+    load_profile "$PROFILE"
+    
+    local layers
+    mapfile -t layers < <(build_dotfile_layers)
+    
+    log_info "Syncing via Stow (Target: $HOME)"
+    
+    local stow_args=(-v -t "$HOME" -d "$DEV_ROOT/dotfiles" --override=".*")
+    
+    # Preflight check for overlaps
+    local -A path_owners
+    local overlaps=0
+    for layer in "${layers[@]}"; do
+        if [[ -d "$DEV_ROOT/dotfiles/$layer" ]]; then
+            while IFS= read -r -d '' file; do
+                local rel="${file#$DEV_ROOT/dotfiles/$layer/}"
+                if [[ -n "${path_owners[$rel]:-}" ]]; then
+                    log_debug "Overlap detected: $rel (Layers: ${path_owners[$rel]}, $layer)"
+                    ((overlaps++)) || true
+                fi
+                path_owners["$rel"]="$layer"
+            done < <(find "$DEV_ROOT/dotfiles/$layer" -type f -not -name "codemap.md" -not -name ".stow-local-ignore" -print0)
+        fi
+    done
+
+    if [[ $overlaps -gt 0 ]] && [[ "$LOG_LEVEL" == "DEBUG" ]]; then
+        log_debug "Total overlaps resolved by precedence: $overlaps"
+    fi
+    
+    # Global ignores for the repo (regex matched against relative paths)
+    stow_args+=(--ignore="^(codemap\.md|README\.md|\.git.*|\.stow-local-ignore|\.DS_Store)$")
+
+    [[ "$DRY_RUN" == "1" ]] && stow_args+=("-n")
+    [[ "$FORCE" == "1" ]] && stow_args+=(--adopt)
+    
+    for layer in "${layers[@]}"; do
+        if [[ -d "$DEV_ROOT/dotfiles/$layer" ]]; then
+            log_info "Stowing layer: $layer"
+            stow "${stow_args[@]}" "$layer"
+        fi
+    done
+
+    if [[ "$DRY_RUN" != "1" ]]; then
+        if declare -f "${PROFILE_NAME}_post_sync" >/dev/null 2>&1; then
+            log_info "Running post-sync hooks for $PROFILE_NAME"
+            "${PROFILE_NAME}_post_sync"
+        fi
+    fi
+}
+
+cmd_promote() {
+    local rel_path="${1:-}"
+    if [[ -z "$rel_path" ]]; then
+        error_exit "Usage: ./dev promote <path>"
+    fi
+
+    require_machine_config
+    load_profile "$PROFILE"
+
+    # Normalize path (remove leading ./ or ~/)
+    rel_path="${rel_path#./}"
+    rel_path="${rel_path#~/}"
+
+    local target_layer="${MACHINE_NAME:-}"
+    if [[ -z "$target_layer" ]]; then
+        error_exit "Machine name not set. Run ./dev init."
+    fi
+
+    local dest_file="$DEV_ROOT/dotfiles/$target_layer/$rel_path"
+    if [[ -e "$dest_file" ]]; then
+        log_info "File already exists in machine layer: $target_layer/$rel_path"
+        return 0
+    fi
+
+    # Find where it's currently coming from
+    local current_src="$HOME/$rel_path"
+    if [[ ! -L "$current_src" ]]; then
+        # If it's a real file, we can just move it to the machine layer
+        if [[ -f "$current_src" ]]; then
+            log_info "Promoting local file to $target_layer layer"
+            mkdir -p "$(dirname "$dest_file")"
+            cp "$current_src" "$dest_file"
+            cmd_stow
+            return 0
+        else
+            error_exit "File not found or not a symlink: $rel_path"
+        fi
+    fi
+
+    local src_file
+    src_file=$(readlink -f "$current_src")
+
+    log_info "Promoting from $(basename "$(dirname "$(dirname "$src_file")")") to $target_layer"
+
+    if [[ "$DRY_RUN" == "1" ]]; then
+        log_dry "cp $src_file $dest_file"
+        return 0
+    fi
+
+    mkdir -p "$(dirname "$dest_file")"
+    cp "$src_file" "$dest_file"
+
+    log_success "Copied to $target_layer/$rel_path"
+    
+    # Refresh links
+    cmd_stow
+}
+
 cmd_status() {
     if ! load_machine_config; then
         log_warn "Not configured. Run './dev init' first."
@@ -767,13 +353,6 @@ cmd_status() {
 
     echo ""
     echo "Legend: ● installed  ◐ needs update  ○ not installed"
-
-    local last_sync
-    last_sync=$(sync_get_last)
-    if [[ -n "$last_sync" ]]; then
-        echo ""
-        echo "Last sync: $last_sync"
-    fi
 }
 
 cmd_list() {
@@ -913,7 +492,7 @@ cmd_doctor() {
         echo "✓ OK"
     fi
 
-    for cmd in git zsh curl; do
+    for cmd in git zsh curl stow; do
         printf "Command '%s': " "$cmd"
         if command -v "$cmd" >/dev/null 2>&1; then
             echo "✓"
@@ -922,6 +501,27 @@ cmd_doctor() {
             ((issues++))
         fi
     done
+
+    # Check for broken symlinks in $HOME that point to this repo
+    printf "Broken symlinks: "
+    local broken_links=()
+    while IFS= read -r -d '' link; do
+        local target
+        target=$(readlink "$link")
+        if [[ "$target" == *"$DEV_ROOT"* ]] && [[ ! -e "$link" ]]; then
+            broken_links+=("$link")
+        fi
+    done < <(find "$HOME" -maxdepth 2 -type l -print0 2>/dev/null)
+
+    if [[ ${#broken_links[@]} -eq 0 ]]; then
+        echo "✓ None found"
+    else
+        echo "✗ ${#broken_links[@]} found"
+        for link in "${broken_links[@]}"; do
+            echo "    $link -> $(readlink "$link")"
+        done
+        ((issues++))
+    fi
 
     echo ""
     if [[ $issues -eq 0 ]]; then
@@ -945,9 +545,8 @@ Usage: ./dev [OPTIONS] COMMAND [ARGS...]
 
 Commands:
   init              First-time setup
-  sync [PATH...]    Deploy dotfiles (all or specific files)
-  diff [PATH]       Show differences between repo and deployed
-  pull [PATH...]    Pull local changes back to dotfiles/common
+  stow              Sync dotfiles using GNU Stow
+  promote <path>    Make a file machine-specific (copy to machine layer)
   install [MODULE]  Install module(s)
   status            Show status
   list              List modules
@@ -957,18 +556,16 @@ Commands:
 
 Options:
   -n, --dry-run     Preview changes
-  -f, --force       Force operation
+  -f, --force       Force operation (adopt existing files)
   -y, --yes         Skip confirmation prompts
   -v, --verbose     Debug output
   -h, --help        Show help
 
 Examples:
-  ./dev sync              Sync all dotfiles (aborts if local changes exist)
-  ./dev sync --force      Sync all dotfiles (overwrite local changes)
-  ./dev sync .aliases     Sync specific file from repo to home
-  ./dev diff              Show what differs from deployed
-  ./dev pull .aliases     Pull local .aliases back to repo
-  ./dev pull --all        Pull all local modifications
+  ./dev stow              Stow dotfiles
+  ./dev promote .zshrc    Make .zshrc machine-specific
+  ./dev --force stow      Stow and adopt existing local files
+  ./dev install core      Install core module
 EOF
 }
 
@@ -1009,14 +606,13 @@ shift || true
 
 case "$command" in
 init) cmd_init "$@" ;;
-sync) cmd_sync "$@" ;;
-diff) cmd_diff "$@" ;;
-pull) cmd_pull "$@" ;;
 install) cmd_install "$@" ;;
 status) cmd_status "$@" ;;
 list) cmd_list "$@" ;;
 show) cmd_show "$@" ;;
 update) cmd_update "$@" ;;
+stow) cmd_stow "$@" ;;
+promote) cmd_promote "$@" ;;
 doctor) cmd_doctor "$@" ;;
 *) error_exit "Unknown command: $command" ;;
 esac
