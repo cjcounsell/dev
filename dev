@@ -239,7 +239,7 @@ cmd_stow() {
     fi
     
     # Global ignores for the repo (regex matched against relative paths)
-    stow_args+=(--ignore="^(codemap\.md|README\.md|\.git.*|\.stow-local-ignore|\.DS_Store)$")
+    stow_args+=(--ignore="^(codemap\.md|README\.md|\.git.*|\.stow-local-ignore|\.DS_Store|auth\.json)$")
 
     [[ "$DRY_RUN" == "1" ]] && stow_args+=("-n")
     [[ "$FORCE" == "1" ]] && stow_args+=(--adopt)
@@ -290,7 +290,7 @@ cmd_promote() {
         if [[ -f "$current_src" ]]; then
             log_info "Promoting local file to $target_layer layer"
             mkdir -p "$(dirname "$dest_file")"
-            cp "$current_src" "$dest_file"
+            mv "$current_src" "$dest_file"
             cmd_stow
             return 0
         else
