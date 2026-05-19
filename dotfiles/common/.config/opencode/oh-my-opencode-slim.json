@@ -1,27 +1,42 @@
 {
     "$schema": "https://unpkg.com/oh-my-opencode-slim@latest/oh-my-opencode-slim.schema.json",
-    "preset": "thirtydollars",
+    "preset": "opencode-zen",
     "multiplexer": {
         "type": "auto",
         "layout": "main-vertical",
         "main_pane_size": 60
     },
-    "council": {
-        "presets": {
-            "default": {
-                "alpha": {
-                    "model": "github-copilot/claude-sonnet-4.6"
-                },
-                "beta": {
-                    "model": "github-copilot/gemini-3.1-pro-preview"
-                },
-                "gamma": {
-                    "model": "github-copilot/gpt-5.5"
-                }
-            }
-        }
-    },
     "presets": {
+        "opencode-zen": {
+            "orchestrator": {
+                "model": "opencode/glm-5.1"
+            },
+            "oracle": {
+                "model": "opencode/deepseek-v4-pro",
+                "variant": "max"
+            },
+            "council": {
+                "model": "opencode/deepseek-v4-pro",
+                "variant": "high"
+            },
+            "librarian": {
+                "model": "opencode/minimax-m2.7"
+            },
+            "explorer": {
+                "model": "opencode/minimax-m2.7"
+            },
+            "designer": {
+                "model": "opencode/kimi-k2.6",
+                "variant": "medium"
+            },
+            "fixer": {
+                "model": "opencode/deepseek-v4-flash",
+                "variant": "high"
+            },
+            "observer": {
+                "model": "opencode-go/kimi-k2.6"
+            }
+        },
         "thirtydollars": {
             "orchestrator": {
                 "model": "github-copilot/gpt-5.5",

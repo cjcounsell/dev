@@ -1,69 +1,69 @@
 {
-  "lastChangelogVersion": "0.74.0",
-  "defaultProvider": "opencode",
-  "defaultModel": "gemini-3-flash",
-  "defaultThinkingLevel": "high",
-  "theme": "dark",
-  "packages": [
-    "npm:pi-web-access",
-    "npm:pi-lens",
-    "npm:pi-mcp-adapter",
-    "npm:pi-subagents",
-    "npm:@juicesharp/rpiv-ask-user-question",
-    "npm:@juicesharp/rpiv-todo"
-  ],
-  "subagents": {
-    "agentOverrides": {
-      "scout": {
-        "model": "opencode/gemini-3-flash",
-        "fallbackModels": [
-          "opencode/qwen3.5-plus"
-        ]
-      },
-      "planner": {
-        "model": "opencode/gpt-5.3-codex",
-        "fallbackModels": [
-          "opencode/gpt-5.4-mini"
-        ]
-      },
-      "worker": {
-        "model": "opencode/gpt-5.3-codex",
-        "fallbackModels": [
-          "opencode/gpt-5.4-mini"
-        ]
-      },
-      "reviewer": {
-        "model": "opencode/gpt-5.3-codex",
-        "fallbackModels": [
-          "opencode/gpt-5.4-mini"
-        ]
-      },
-      "context-builder": {
-        "model": "opencode/gemini-3-flash",
-        "fallbackModels": [
-          "opencode/qwen3.5-plus"
-        ]
-      },
-      "researcher": {
-        "model": "opencode/gemini-3-flash",
-        "fallbackModels": [
-          "opencode/qwen3.5-plus"
-        ]
-      },
-      "delegate": {
-        "model": "opencode/gemini-3-flash",
-        "fallbackModels": [
-          "opencode/qwen3.5-plus"
-        ]
-      },
-      "oracle": {
-        "model": "opencode/gpt-5.3-codex",
-        "fallbackModels": [
-          "opencode/gpt-5.4-mini"
-        ]
-      }
-    }
-  },
-  "quietStartup": true,
-  "enableInstallTelemetry": false
+    "lastChangelogVersion": "0.75.3",
+    "defaultProvider": "opencode",
+    "defaultModel": "claude-sonnet-4-6",
+    "defaultThinkingLevel": "high",
+    "theme": "dark",
+    "packages": [
+        "npm:pi-web-access",
+        "npm:pi-lens",
+        "npm:pi-mcp-adapter",
+        "npm:pi-subagents",
+        "npm:@juicesharp/rpiv-ask-user-question",
+        "npm:@juicesharp/rpiv-todo"
+    ],
+    "subagents": {
+        "agentOverrides": {
+            "scout": {
+                "model": "opencode/gemini-3-flash",
+                "fallbackModels": [
+                    "opencode/qwen3.5-plus"
+                ]
+            },
+            "planner": {
+                "model": "opencode/gpt-5.3-codex",
+                "fallbackModels": [
+                    "opencode/gpt-5.4-mini"
+                ]
+            },
+            "worker": {
+                "model": "opencode/gpt-5.3-codex",
+                "fallbackModels": [
+                    "opencode/gpt-5.4-mini"
+                ]
+            },
+            "reviewer": {
+                "model": "opencode/gpt-5.3-codex",
+                "fallbackModels": [
+                    "opencode/gpt-5.4-mini"
+                ]
+            },
+            "context-builder": {
+                "model": "opencode/gemini-3-flash",
+                "fallbackModels": [
+                    "opencode/qwen3.5-plus"
+                ]
+            },
+            "researcher": {
+                "model": "opencode/gemini-3-flash",
+                "fallbackModels": [
+                    "opencode/qwen3.5-plus"
+                ]
+            },
+            "delegate": {
+                "model": "opencode/gemini-3-flash",
+                "fallbackModels": [
+                    "opencode/qwen3.5-plus"
+                ]
+            },
+            "oracle": {
+                "model": "opencode/gpt-5.3-codex",
+                "fallbackModels": [
+                    "opencode/gpt-5.4-mini"
+                ]
+            }
+        }
+    },
+    "quietStartup": true,
+    "enableInstallTelemetry": false
 }
