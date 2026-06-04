@@ -10,6 +10,9 @@ for config in "${configs[@]}"; do
   [[ -f "$config" ]] && source "$config"
 done
 
+# Reset terminal cursor color to default on each prompt
+precmd() { echo -ne "\e]12;white\a" }
+
 # Key bindings
 bindkey '^ ' autosuggest-accept
 bindkey -s '^f' 'tmux-sessionizer\n'
