@@ -1,12 +1,40 @@
 {
     "$schema": "https://unpkg.com/oh-my-opencode-slim@latest/oh-my-opencode-slim.schema.json",
-    "preset": "opencode-zen",
+    "preset": "work",
     "multiplexer": {
         "type": "auto",
         "layout": "main-vertical",
         "main_pane_size": 60
     },
     "presets": {
+        "work": {
+            "orchestrator": {
+                "model": "github-copilot/gpt-5.4"
+            },
+            "oracle": {
+                "model": "github-copilot/gpt-5.4",
+                "variant": "high"
+            },
+            "council": {
+                "model": "github-copilot/claude-sonnet-4.6",
+                "variant": "high"
+            },
+            "librarian": {
+                "model": "github-copilot/gpt-5-mini"
+            },
+            "explorer": {
+                "model": "github-copilot/gpt-5-mini"
+            },
+            "designer": {
+                "model": "github-copilot/gemini-2.5-pro"
+            },
+            "fixer": {
+                "model": "github-copilot/claude-sonnet-4.6"
+            },
+            "observer": {
+                "model": "github-copilot/gemini-2.5-pro"
+            }
+        },
         "opencode-zen": {
             "orchestrator": {
                 "model": "opencode/glm-5.1"
