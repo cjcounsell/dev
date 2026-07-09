@@ -1,5 +1,12 @@
 #!/usr/bin/env zsh
 
+for f in \
+  "$HOME/.config/zsh/init.zsh" \
+  "$HOME/.config/zsh/aliases.zsh"
+do
+  [[ -f "$f" ]] && source "$f"
+done
+
 # Source external configuration files if they exist
 local configs=(
   "$HOME/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh"
