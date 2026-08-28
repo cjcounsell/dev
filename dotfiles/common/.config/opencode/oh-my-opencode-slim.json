@@ -1,6 +1,6 @@
 {
     "$schema": "https://unpkg.com/oh-my-opencode-slim@latest/oh-my-opencode-slim.schema.json",
-    "preset": "work",
+    "preset": "opencode-zen",
     "multiplexer": {
         "type": "auto",
         "layout": "main-vertical",
@@ -37,7 +37,7 @@
         },
         "opencode-zen": {
             "orchestrator": {
-                "model": "opencode/glm-5.1"
+                "model": "opencode/glm-5.2"
             },
             "oracle": {
                 "model": "opencode/deepseek-v4-pro",
