@@ -27,5 +27,9 @@ export SNACKS_WEZTERM=true
 export SUDO_EDITOR="$EDITOR"
 export BAT_THEME=ansi
 
-# Duplicated from .config/uwsm/env so SSH works too
-export PATH=$HOME/.local/bin:$PATH
+# Omarchy 4 (quattro) is a pacman package and manages OMARCHY_PATH itself
+# (/usr/share/omarchy, or a dev checkout via /etc/omarchy.conf) through
+# /etc/profile.d/omarchy.sh and the uwsm env.d. Do not re-export the retired
+# ~/.local/share/omarchy git-checkout path here — it is not a git checkout
+# anymore and breaks `omarchy update`.
+export PATH="$HOME/.local/bin:$PATH"
