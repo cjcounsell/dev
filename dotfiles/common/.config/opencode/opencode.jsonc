@@ -1,8 +1,8 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": [
-    "oh-my-opencode-slim",
-    "superpowers@git+https://github.com/obra/superpowers.git"
+    "superpowers@git+https://github.com/obra/superpowers.git",
+    "oh-my-openagent@latest"
   ],
   "model": "opencode/claude-sonnet-4-6",
   "autoupdate": false,
@@ -14,14 +14,6 @@
       "headers": {
         "Authorization": "Bearer {file:~/.secrets/gh_mcp_token}"
       }
-    }
-  },
-  "agent": {
-    "explore": {
-      "disable": true
-    },
-    "general": {
-      "disable": true
     }
   }
 }

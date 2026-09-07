@@ -1,6 +1,6 @@
 {
     "$schema": "https://unpkg.com/oh-my-opencode-slim@latest/oh-my-opencode-slim.schema.json",
-    "preset": "opencode-zen",
+    "preset": "balanced",
     "multiplexer": {
         "type": "auto",
         "layout": "main-vertical",
@@ -35,9 +35,9 @@
                 "model": "github-copilot/gemini-2.5-pro"
             }
         },
-        "opencode-zen": {
+        "balanced": {
             "orchestrator": {
-                "model": "opencode/glm-5.2"
+                "model": "opencode/glm-5.3"
             },
             "oracle": {
                 "model": "opencode/deepseek-v4-pro",
@@ -58,111 +58,37 @@
                 "variant": "medium"
             },
             "fixer": {
-                "model": "opencode/deepseek-v4-pro",
+                "model": "opencode/kimi-k2.7-code",
                 "variant": "high"
             },
             "observer": {
                 "model": "opencode/gemini-3-flash"
             }
         },
-        "thirtydollars": {
+        "super-saver": {
             "orchestrator": {
-                "model": "github-copilot/gpt-5.5",
-                "skills": [
-                    "*"
-                ],
-                "mcps": [
-                    "*",
-                    "websearch"
-                ]
+                "model": "opencode/gpt-5-nano"
             },
             "oracle": {
-                "model": "github-copilot/gpt-5.5",
-                "variant": "high",
-                "skills": [],
-                "mcps": []
+                "model": "opencode/deepseek-v4-flash"
             },
             "council": {
-                "model": "github-copilot/gpt-5.5"
+                "model": "opencode/deepseek-v4-flash"
             },
             "librarian": {
-                "model": "github-copilot/gpt-5.4-mini",
-                "variant": "low",
-                "skills": [],
-                "mcps": [
-                    "websearch",
-                    "context7",
-                    "grep_app"
-                ]
+                "model": "opencode/gpt-5-nano"
             },
             "explorer": {
-                "model": "github-copilot/gpt-5.4-mini",
-                "variant": "low",
-                "skills": [],
-                "mcps": []
+                "model": "opencode/deepseek-v4-flash"
             },
             "designer": {
-                "model": "github-copilot/gemini-3.1-pro-preview",
-                "skills": [
-                    "agent-browser"
-                ],
-                "mcps": []
+                "model": "opencode/glm-5.3-flash"
             },
             "fixer": {
-                "model": "github-copilot/gpt-5.4-mini",
-                "variant": "low",
-                "skills": [],
-                "mcps": []
-            }
-        },
-        "openai": {
-            "orchestrator": {
-                "model": "openai/gpt-5.5",
-                "skills": [
-                    "*"
-                ],
-                "mcps": [
-                    "*",
-                    "!context7"
-                ]
+                "model": "opencode/glm-5.3-flash"
             },
-            "oracle": {
-                "model": "openai/gpt-5.5",
-                "variant": "high",
-                "skills": [
-                    "simplify"
-                ],
-                "mcps": []
-            },
-            "librarian": {
-                "model": "openai/gpt-5.4-mini",
-                "variant": "low",
-                "skills": [],
-                "mcps": [
-                    "websearch",
-                    "context7",
-                    "grep_app"
-                ]
-            },
-            "explorer": {
-                "model": "openai/gpt-5.4-mini",
-                "variant": "low",
-                "skills": [],
-                "mcps": []
-            },
-            "designer": {
-                "model": "openai/gpt-5.4-mini",
-                "variant": "medium",
-                "skills": [
-                    "agent-browser"
-                ],
-                "mcps": []
-            },
-            "fixer": {
-                "model": "openai/gpt-5.4-mini",
-                "variant": "low",
-                "skills": [],
-                "mcps": []
+            "observer": {
+                "model": "opencode/deepseek-v4-flash-vision-exp"
             }
         }
     }
