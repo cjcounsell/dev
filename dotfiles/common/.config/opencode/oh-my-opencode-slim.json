@@ -12,27 +12,25 @@
                 "model": "github-copilot/gpt-5.4"
             },
             "oracle": {
-                "model": "github-copilot/gpt-5.4",
-                "variant": "high"
+                "model": "github-copilot/claude-sonnet-5"
             },
             "council": {
-                "model": "github-copilot/claude-sonnet-4.6",
-                "variant": "high"
+                "model": "github-copilot/claude-sonnet-5"
             },
             "librarian": {
-                "model": "github-copilot/gpt-5-mini"
+                "model": "github-copilot/gpt-5.4-mini"
             },
             "explorer": {
-                "model": "github-copilot/gpt-5-mini"
+                "model": "github-copilot/gpt-5.4-mini"
             },
             "designer": {
-                "model": "github-copilot/gemini-2.5-pro"
+                "model": "github-copilot/claude-sonnet-5"
             },
             "fixer": {
-                "model": "github-copilot/claude-sonnet-4.6"
+                "model": "github-copilot/gpt-5.4-mini"
             },
             "observer": {
-                "model": "github-copilot/gemini-2.5-pro"
+                "model": "github-copilot/claude-sonnet-5"
             }
         },
         "balanced": {

@@ -20,7 +20,7 @@ fi
 alias cat="bat"
 alias lg="lazygit"
 alias lzd="lazydocker"
-alias oc="opencode"
+alias oc="HEADROOM_LOG_MESSAGES=1 nono run --allow-cwd --profile opencode-local headroom wrap opencode --copilot-subscription --no-serena"
 alias occ="opencode -c"
 alias ocs="opencode serve --port=4096"
 alias sail='[ -f sail ] && sh sail || sh vendor/bin/sail'

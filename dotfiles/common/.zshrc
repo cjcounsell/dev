@@ -2,7 +2,9 @@
 
 for f in \
   "$HOME/.config/zsh/init.zsh" \
-  "$HOME/.config/zsh/aliases.zsh"
+  "$HOME/.config/zsh/aliases.zsh" \
+  "$HOME/.config/zsh/fns.zsh" \
+  "$HOME/.config/zsh/work.zsh"
 do
   [[ -f "$f" ]] && source "$f"
 done
