@@ -12,7 +12,6 @@ alias ff="fzf --preview 'bat --style=numbers --color=always {}'"
 alias eff='$EDITOR "$(ff)"'
 
 # Tools
-alias ani-cli="ani-cli --vlc"
 alias air="$HOME/go/bin/air"
 if command -v batcat >/dev/null 2>&1; then
     alias bat="batcat"
